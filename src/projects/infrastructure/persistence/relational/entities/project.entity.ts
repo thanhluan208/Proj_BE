@@ -23,16 +23,16 @@ export class ProjectEntity extends EntityRelationalHelper {
   name: string;
 
   @Column({ type: String, nullable: true })
-  description: string | null;
+  description?: string;
 
   @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
-  progress: number | null;
+  progress?: number;
 
   @Column({ type: Date, nullable: true })
-  startAt: Date;
+  startAt?: Date;
 
   @Column({ type: Date, nullable: true })
-  endAt: Date;
+  endAt?: Date;
 
   @ManyToOne(() => StatusEntity, {
     eager: true,

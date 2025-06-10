@@ -17,7 +17,7 @@ export class Project {
     type: String,
     example: `Project101's description`,
   })
-  description: string | null;
+  description?: string;
 
   @ApiProperty({
     type: Number,
@@ -25,7 +25,7 @@ export class Project {
     description:
       'Project progress as a decimal number with 2 decimal places (0-100)',
   })
-  progress: number | null;
+  progress?: number;
 
   @ApiProperty({
     type: () => Status,
@@ -35,12 +35,12 @@ export class Project {
   @ApiProperty({
     type: Date,
   })
-  startAt: Date;
+  startAt?: Date;
 
   @ApiProperty({
     type: Date,
   })
-  endAt: Date;
+  endAt?: Date;
 
   @ApiProperty()
   createdAt: Date;

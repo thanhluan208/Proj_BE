@@ -18,6 +18,7 @@ import { DataSource } from 'typeorm';
 import { TypeOrmConfigService } from './database/typeorm-config.service';
 import { SessionModule } from './session/session.module';
 import { UserProjectModule } from './user-project/user-project.module';
+import { ProjectsModule } from './projects/projects.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { UserProjectModule } from './user-project/user-project.module';
       inject: [ConfigService],
     }),
     UsersModule,
+    ProjectsModule,
     SessionModule,
     AuthModule,
     MailModule,

@@ -1,6 +1,6 @@
+import { Project } from 'src/projects/domain/project';
 import { DeepPartial } from 'src/utils/types/deep-partial.type';
 import { NullableType } from 'src/utils/types/nullable.type';
-import { Project } from '../domain/project';
 
 export abstract class ProjectRepository {
   abstract create(

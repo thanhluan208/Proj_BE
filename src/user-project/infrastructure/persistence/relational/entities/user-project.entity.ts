@@ -10,9 +10,10 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { StatusEntity } from 'src/statuses/infrastructure/persistence/relational/entities/status.entity';
 
 @Entity({
-  name: 'user_project',
+  name: 'user-project',
 })
 export class UserProjectEntity extends EntityRelationalHelper {
   @PrimaryGeneratedColumn('uuid')
@@ -24,13 +25,16 @@ export class UserProjectEntity extends EntityRelationalHelper {
   @ManyToOne(() => ProjectEntity)
   project: ProjectEntity;
 
+  @ManyToOne(() => StatusEntity)
+  status: StatusEntity;
+
   @ManyToOne(() => UserEntity, {
     nullable: true,
   })
-  addedBy?: UserEntity | null;
+  addedBy?: UserEntity;
 
   @Column({ type: String, nullable: true })
-  role?: string | null;
+  role?: string;
 
   @Column({ type: Date })
   joinedAt?: Date;

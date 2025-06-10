@@ -30,17 +30,17 @@ export class UserProject {
     type: String,
     example: 'Backend Developer',
   })
-  role: string;
+  role?: string;
 
   @ApiProperty({
     type: Date,
   })
-  joinedAt: Date;
+  joinedAt?: Date;
 
   @ApiProperty({
     type: () => Status,
   })
-  status?: Status;
+  status: Status;
 
   @ApiProperty()
   createdAt: Date;
