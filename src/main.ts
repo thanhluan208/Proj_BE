@@ -1,0 +1,52 @@
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { ConfigService } from '@nestjs/config';
+import { ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  // Get configuration service
+  const configService = app.get(ConfigService);
+
+  // Enable global validation
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+
+  // Enable CORS if needed
+  app.enableCors();
+
+  // Swagger Configuration
+  const config = new DocumentBuilder()
+    .setTitle('Project Management API')
+    .setDescription('API documentation for Project Management System')
+    .setVersion('1.0')
+    .addTag('users', 'User management endpoints')
+    .addTag('projects', 'Project management endpoints')
+    .addTag('user-projects', 'User-Project relationship endpoints')
+    .addBearerAuth() // Add this if you plan to use JWT authentication
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true, // Keep authorization when page refreshes
+    },
+  });
+
+  // Get port from environment or default to 3000
+  const port = (configService.get('PORT') as number) || 3000;
+
+  await app.listen(port);
+
+  console.log(`Application is running on: http://localhost:${port}`);
+  console.log(`Swagger documentation: http://localhost:${port}/api/docs`);
+}
+
+void bootstrap();
