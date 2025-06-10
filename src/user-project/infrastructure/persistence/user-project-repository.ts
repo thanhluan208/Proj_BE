@@ -1,4 +1,6 @@
+import { Project } from 'src/projects/domain/project';
 import { UserProject } from 'src/user-project/domain/user-project';
+import { User } from 'src/users/domain/user';
 import { DeepPartial } from 'src/utils/types/deep-partial.type';
 import { NullableType } from 'src/utils/types/nullable.type';
 
@@ -8,6 +10,8 @@ export abstract class UserProjectRepository {
   ): Promise<UserProject>;
 
   abstract findById(id: UserProject['id']): Promise<NullableType<UserProject>>;
+
+  abstract findByUser(user_id: User['id']): Promise<Project[]>;
 
   abstract update(
     id: UserProject['id'],

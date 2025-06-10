@@ -7,25 +7,27 @@ import { In, Repository } from 'typeorm';
 import { UserProjectRepository } from '../../user-project-repository';
 import { UserProjectEntity } from '../entities/user-project.entity';
 import { UserProjectMapper } from '../mappers/user-project.mapper';
+import { Project } from 'src/projects/domain/project';
+import { User } from 'src/users/domain/user';
 
 @Injectable()
 export class UsersProjectRelationalRepository implements UserProjectRepository {
   constructor(
     @InjectRepository(UserProjectEntity)
-    private readonly usersRepository: Repository<UserProjectEntity>,
+    private readonly userProjectRepository: Repository<UserProjectEntity>,
   ) {}
 
   async create(data: UserProject): Promise<UserProject> {
     const persistenceModel = UserProjectMapper.toPersistence(data);
 
-    const newEntity = await this.usersRepository.save(
-      this.usersRepository.create(persistenceModel),
+    const newEntity = await this.userProjectRepository.save(
+      this.userProjectRepository.create(persistenceModel),
     );
     return UserProjectMapper.toDomain(newEntity);
   }
 
   async findById(id: UserProject['id']): Promise<NullableType<UserProject>> {
-    const entity = await this.usersRepository.findOne({
+    const entity = await this.userProjectRepository.findOne({
       where: { id },
     });
 
@@ -33,18 +35,28 @@ export class UsersProjectRelationalRepository implements UserProjectRepository {
   }
 
   async findByIds(ids: UserProject['id'][]): Promise<UserProject[]> {
-    const entities = await this.usersRepository.find({
+    const entities = await this.userProjectRepository.find({
       where: { id: In(ids) },
     });
 
     return entities.map((user) => UserProjectMapper.toDomain(user));
   }
 
+  async findByUser(user_id: User['id']): Promise<Project[]> {
+    const entities = await this.userProjectRepository.find({
+      where: {
+        user: { id: user_id },
+      },
+    });
+
+    return entities.map((entity) => UserProjectMapper.toDomain(entity).project);
+  }
+
   async update(
     id: UserProject['id'],
     payload: Partial<UserProject>,
   ): Promise<UserProject> {
-    const entity = await this.usersRepository.findOne({
+    const entity = await this.userProjectRepository.findOne({
       where: { id },
     });
 
@@ -52,8 +64,8 @@ export class UsersProjectRelationalRepository implements UserProjectRepository {
       throw new Error('UserProject not found');
     }
 
-    const updatedEntity = await this.usersRepository.save(
-      this.usersRepository.create(
+    const updatedEntity = await this.userProjectRepository.save(
+      this.userProjectRepository.create(
         UserProjectMapper.toPersistence({
           ...UserProjectMapper.toDomain(entity),
           ...payload,
@@ -65,6 +77,6 @@ export class UsersProjectRelationalRepository implements UserProjectRepository {
   }
 
   async remove(id: UserProject['id']): Promise<void> {
-    await this.usersRepository.softDelete(id);
+    await this.userProjectRepository.softDelete(id);
   }
 }

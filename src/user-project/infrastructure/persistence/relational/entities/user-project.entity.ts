@@ -22,7 +22,9 @@ export class UserProjectEntity extends EntityRelationalHelper {
   @ManyToOne(() => UserEntity)
   user: UserEntity;
 
-  @ManyToOne(() => ProjectEntity)
+  @ManyToOne(() => ProjectEntity, {
+    eager: true,
+  })
   project: ProjectEntity;
 
   @ManyToOne(() => StatusEntity)

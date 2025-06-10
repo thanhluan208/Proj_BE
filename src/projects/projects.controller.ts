@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
@@ -27,5 +28,14 @@ export class ProjectsController {
   @HttpCode(HttpStatus.CREATED)
   create(@Request() request, @Body() body: CreateProjectDto): Promise<Project> {
     return this.projectsService.create(body, request.user);
+  }
+
+  @ApiCreatedResponse({
+    type: Project,
+  })
+  @Get()
+  @HttpCode(HttpStatus.CREATED)
+  findByUser(@Request() request): Promise<Project[]> {
+    return this.projectsService.findByUser(request.user.id);
   }
 }

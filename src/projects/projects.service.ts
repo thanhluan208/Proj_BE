@@ -4,14 +4,14 @@ import {
   Logger,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { ProjectRepository } from './infrastructure/persistence/project.repository';
-import { CreateProjectDto } from './dto/create-project.dto';
-import { StatusEnum } from 'src/statuses/statuses.enum';
-import { Project } from './domain/project';
-import { NullableType } from 'src/utils/types/nullable.type';
-import { UserProjectService } from 'src/user-project/user-project.service';
 import { JwtPayloadType } from 'src/auth/strategies/types/jwt-payload.type';
+import { StatusEnum } from 'src/statuses/statuses.enum';
+import { UserProjectService } from 'src/user-project/user-project.service';
 import { UserService } from 'src/users/users.service';
+import { NullableType } from 'src/utils/types/nullable.type';
+import { Project } from './domain/project';
+import { CreateProjectDto } from './dto/create-project.dto';
+import { ProjectRepository } from './infrastructure/persistence/project.repository';
 
 @Injectable()
 export class ProjectsService {
@@ -56,6 +56,10 @@ export class ProjectsService {
     });
 
     return newProjectEntity;
+  }
+
+  findByUser(user_id: string): Promise<Project[]> {
+    return this.userProjectService.findByUser(user_id);
   }
 
   findById(id: Project['id']): Promise<NullableType<Project>> {

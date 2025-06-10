@@ -9,4 +9,8 @@ export class UserProjectService {
   create(createUserProjectDto: CreateUserProjectDto) {
     return this.userProjectRepository.create(createUserProjectDto);
   }
+
+  findByUser(user_id: string) {
+    return this.userProjectRepository.findByUser(user_id);
+  }
 }
