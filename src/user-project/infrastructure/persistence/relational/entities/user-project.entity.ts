@@ -1,4 +1,5 @@
-import { StatusEntity } from 'src/statuses/infrastructure/persistence/relational/entities/status.entity';
+import { UserEntity } from 'src/users/infrastructure/persistence/relational/entities/user.entity';
+import { ProjectEntity } from 'src/projects/infrastructure/persistence/relational/entities/project.entity';
 import { EntityRelationalHelper } from 'src/utils/relational-entity-helper';
 import {
   Column,
@@ -11,22 +12,28 @@ import {
 } from 'typeorm';
 
 @Entity({
-  name: 'user-project',
+  name: 'user_project',
 })
 export class UserProjectEntity extends EntityRelationalHelper {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: String })
-  role: string;
+  @ManyToOne(() => UserEntity)
+  user: UserEntity;
 
-  @Column()
-  joinedAt: Date;
+  @ManyToOne(() => ProjectEntity)
+  project: ProjectEntity;
 
-  @ManyToOne(() => StatusEntity, {
-    eager: true,
+  @ManyToOne(() => UserEntity, {
+    nullable: true,
   })
-  status?: StatusEntity;
+  addedBy?: UserEntity | null;
+
+  @Column({ type: String, nullable: true })
+  role?: string | null;
+
+  @Column({ type: Date })
+  joinedAt?: Date;
 
   @CreateDateColumn()
   createdAt: Date;

@@ -1,6 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Expose } from 'class-transformer';
 import { Status } from '../../statuses/domain/status';
+import { User } from 'src/users/domain/user';
+import { Project } from 'src/projects/domain/project';
 
 @Expose({ groups: ['me'] })
 export class UserProject {
@@ -8,6 +10,21 @@ export class UserProject {
     type: String,
   })
   id: string;
+
+  @ApiProperty({
+    type: () => User,
+  })
+  user: User;
+
+  @ApiProperty({
+    type: () => Project,
+  })
+  project: Project;
+
+  @ApiProperty({
+    type: () => User,
+  })
+  addedBy?: User;
 
   @ApiProperty({
     type: String,
