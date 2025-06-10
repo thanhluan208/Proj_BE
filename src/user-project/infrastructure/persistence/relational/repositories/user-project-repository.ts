@@ -9,6 +9,7 @@ import { UserProjectEntity } from '../entities/user-project.entity';
 import { UserProjectMapper } from '../mappers/user-project.mapper';
 import { Project } from 'src/projects/domain/project';
 import { User } from 'src/users/domain/user';
+import { PaginationOptions } from '../../user-project-repository';
 
 @Injectable()
 export class UsersProjectRelationalRepository implements UserProjectRepository {
@@ -42,14 +43,27 @@ export class UsersProjectRelationalRepository implements UserProjectRepository {
     return entities.map((user) => UserProjectMapper.toDomain(user));
   }
 
-  async findByUser(user_id: User['id']): Promise<Project[]> {
+  async findByUser(
+    user_id: User['id'],
+    options?: PaginationOptions,
+  ): Promise<Project[]> {
     const entities = await this.userProjectRepository.find({
       where: {
         user: { id: user_id },
       },
+      skip: options?.skip,
+      take: options?.take,
     });
 
     return entities.map((entity) => UserProjectMapper.toDomain(entity).project);
+  }
+
+  async countByUser(user_id: User['id']): Promise<number> {
+    return this.userProjectRepository.count({
+      where: {
+        user: { id: user_id },
+      },
+    });
   }
 
   async update(
