@@ -6,23 +6,20 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
-import { User } from './domain/user';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UserRepository } from './infrastructure/persistence/user.repository';
+import { UserRepository } from './user.repository';
 import { AuthProvidersEnum } from 'src/auth/auth-providers.enum';
 import { RoleEnum } from 'src/roles/roles.enum';
-import { Role } from 'src/roles/domain/role';
-import { Status } from 'src/statuses/domain/status';
 import { StatusEnum } from 'src/statuses/statuses.enum';
-import { NullableType } from 'src/utils/types/nullable.type';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserEntity } from './user.entity';
 
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
   constructor(private readonly usersRepository: UserRepository) {}
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
+  async create(createUserDto: CreateUserDto): Promise<UserEntity> {
     this.logger.log(`Create user called for email: ${createUserDto.email}`);
     const existing = await this.usersRepository.findByEmail(
       createUserDto.email,
@@ -34,7 +31,7 @@ export class UserService {
       throw new BadRequestException('Email already exists');
     }
 
-    let role: Role | undefined = undefined;
+    let role: { id: string } | undefined = undefined;
 
     if (createUserDto.role?.id !== undefined) {
       const roleObject = Object.values(RoleEnum)
@@ -50,11 +47,11 @@ export class UserService {
       }
 
       role = {
-        id: createUserDto.role.id,
+        id: String(createUserDto.role.id),
       };
     }
 
-    let status: Status | undefined = undefined;
+    let status: { id: string } | undefined = undefined;
 
     if (createUserDto.status?.id !== undefined) {
       const statusObject = Object.values(StatusEnum)
@@ -70,7 +67,7 @@ export class UserService {
       }
 
       status = {
-        id: createUserDto.status.id,
+        id: String(createUserDto.status.id),
       };
     }
 
@@ -81,8 +78,8 @@ export class UserService {
       firstName: createUserDto.firstName,
       lastName: createUserDto.lastName,
       provider: createUserDto.provider ?? AuthProvidersEnum.email,
-      role: role,
-      status: status,
+      role: role as any,
+      status: status as any,
       email: createUserDto.email,
       password: hashedPassword,
     });
@@ -91,22 +88,22 @@ export class UserService {
     return user;
   }
 
-  findById(id: User['id']): Promise<NullableType<User>> {
+  findById(id: string): Promise<UserEntity | null> {
     return this.usersRepository.findById(id);
   }
 
-  findByIds(ids: User['id'][]): Promise<User[]> {
+  findByIds(ids: string[]): Promise<UserEntity[]> {
     return this.usersRepository.findByIds(ids);
   }
 
-  findByEmail(email: User['email']): Promise<NullableType<User>> {
+  findByEmail(email: string | null): Promise<UserEntity | null> {
     return this.usersRepository.findByEmail(email);
   }
 
   async update(
-    id: User['id'],
+    id: string,
     updateUserDto: UpdateUserDto,
-  ): Promise<User | null> {
+  ): Promise<UserEntity | null> {
     // Do not remove comment below.
     // <updating-property />
 
@@ -142,7 +139,7 @@ export class UserService {
       email = null;
     }
 
-    let role: Role | undefined = undefined;
+    let role: { id: string } | undefined = undefined;
 
     if (updateUserDto.role?.id) {
       const roleObject = Object.values(RoleEnum)
@@ -158,11 +155,11 @@ export class UserService {
       }
 
       role = {
-        id: updateUserDto.role.id,
+        id: String(updateUserDto.role.id),
       };
     }
 
-    let status: Status | undefined = undefined;
+    let status: { id: string } | undefined = undefined;
 
     if (updateUserDto.status?.id) {
       const statusObject = Object.values(StatusEnum)
@@ -178,7 +175,7 @@ export class UserService {
       }
 
       status = {
-        id: updateUserDto.status.id,
+        id: String(updateUserDto.status.id),
       };
     }
 
@@ -189,13 +186,13 @@ export class UserService {
       lastName: updateUserDto.lastName,
       email,
       password,
-      role,
-      status,
+      role: role as any,
+      status: status as any,
       provider: updateUserDto.provider,
     });
   }
 
-  async remove(id: User['id']): Promise<void> {
+  async remove(id: string): Promise<void> {
     await this.usersRepository.remove(id);
   }
 }

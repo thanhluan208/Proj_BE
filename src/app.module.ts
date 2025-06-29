@@ -1,31 +1,33 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import databaseConfig from './database/config/database.config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { HealthController } from './health/health.controller';
-import { AuthModule } from './auth/auth.module';
-import { MailModule } from './mail/mail.module';
-import mailConfig from './mail/config/mail.config';
 import { HeaderResolver, I18nModule } from 'nestjs-i18n';
-import { AllConfigType } from './config/config.type';
 import path from 'path';
-import { MailerModule } from './mailer/mailer.module';
+import { DataSource, DataSourceOptions } from 'typeorm';
+import { AuthModule } from './auth/auth.module';
 import authConfig from './auth/config/auth.config';
 import appConfig from './config/app.config';
-import { UsersModule } from './users/users.module';
-import { DataSourceOptions } from 'typeorm';
-import { DataSource } from 'typeorm';
+import { AllConfigType } from './config/config.type';
+import databaseConfig from './database/config/database.config';
 import { TypeOrmConfigService } from './database/typeorm-config.service';
+import { FilesModule } from './files/files.module';
+import minioConfig from './files/config/minio.config';
+import { HealthController } from './health/health.controller';
+import { HousesModule } from './houses/house.module';
+import mailConfig from './mail/config/mail.config';
+import { MailModule } from './mail/mail.module';
+import { MailerModule } from './mailer/mailer.module';
+import { RoomModule } from './rooms/room.module';
 import { SessionModule } from './session/session.module';
-import { UserProjectModule } from './user-project/user-project.module';
-import { ProjectsModule } from './projects/projects.module';
+import { TenantModule } from './tenant/tenant.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
     // Configuration Module
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, mailConfig, authConfig, appConfig],
+      load: [databaseConfig, mailConfig, authConfig, appConfig, minioConfig],
       envFilePath: '.env',
     }),
 
@@ -65,12 +67,15 @@ import { ProjectsModule } from './projects/projects.module';
       inject: [ConfigService],
     }),
     UsersModule,
-    ProjectsModule,
     SessionModule,
     AuthModule,
     MailModule,
     MailerModule,
-    UserProjectModule,
+
+    HousesModule,
+    RoomModule,
+    TenantModule,
+    FilesModule,
   ],
   controllers: [HealthController],
   providers: [],

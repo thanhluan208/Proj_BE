@@ -27,9 +27,6 @@ async function bootstrap() {
     .setTitle('Project Management API')
     .setDescription('API documentation for Project Management System')
     .setVersion('1.0')
-    .addTag('users', 'User management endpoints')
-    .addTag('projects', 'Project management endpoints')
-    .addTag('user-projects', 'User-Project relationship endpoints')
     .addBearerAuth() // Add this if you plan to use JWT authentication
     .build();
 

@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserController } from './users.controller';
 import { UserService } from './users.service';
-import { RelationalUserPersistenceModule } from './infrastructure/persistence/relational/relational-persistence.module';
+import { UserEntity } from './user.entity';
+import { UserRepository } from './user.repository';
 
 @Module({
-  imports: [RelationalUserPersistenceModule],
+  imports: [TypeOrmModule.forFeature([UserEntity])],
   controllers: [UserController],
-  providers: [UserService],
-  exports: [UserService, RelationalUserPersistenceModule],
+  providers: [UserService, UserRepository],
+  exports: [UserService],
 })
 export class UsersModule {}

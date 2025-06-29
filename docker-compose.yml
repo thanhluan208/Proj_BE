@@ -10,19 +10,34 @@ services:
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
       POSTGRES_DB: ${DATABASE_NAME}
 
-  maildev:
-    build:
-      context: .
-      dockerfile: maildev.Dockerfile
-    ports:
-      - ${MAIL_CLIENT_PORT}:1080
-      - ${MAIL_PORT}:1025
+  # maildev:
+  #   build:
+  #     context: .
+  #     dockerfile: maildev.Dockerfile
+  #   ports:
+  #     - ${MAIL_CLIENT_PORT}:1080
+  #     - ${MAIL_PORT}:1025
 
   adminer:
     image: adminer
     restart: always
     ports:
       - 8080:8080
+
+  minio:
+    image: bitnami/minio:2024.11.7
+    restart: always
+    ports:
+      - ${MINIO_PORT}:${MINIO_PORT}
+      - ${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_PORT}
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+      MINIO_DEFAULT_BUCKETS: ${MINIO_BUCKET}
+      MINIO_API_PORT_NUMBER: ${MINIO_PORT}
+      MINIO_CONSOLE_PORT_NUMBER: ${MINIO_CONSOLE_PORT}
+    volumes:
+      - minio-data:/bitnami/minio/data    
 
   # Uncomment to use redis
   # redis:
@@ -39,3 +54,4 @@ services:
 
 volumes:
   boilerplate-db:
+  minio-data:

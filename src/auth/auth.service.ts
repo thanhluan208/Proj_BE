@@ -11,7 +11,6 @@ import { MailService } from 'src/mail/mail.service';
 import { JwtService } from '@nestjs/jwt';
 import { AuthRegisterLoginDto } from './dto/auth-register.dto';
 import { UserService } from 'src/users/users.service';
-import { User } from 'src/users/domain/user';
 import { StatusEnum } from 'src/statuses/statuses.enum';
 import { RoleEnum } from 'src/roles/roles.enum';
 import { AuthEmailLoginDto } from './dto/auth-email-login.dto';
@@ -21,8 +20,10 @@ import bcrypt from 'bcryptjs';
 import { AuthProvidersEnum } from './auth-providers.enum';
 import { randomStringGenerator } from '@nestjs/common/utils/random-string-generator.util';
 import { SessionService } from 'src/session/session.service';
-import { Session } from 'src/session/domain/session';
 import ms from 'ms';
+import { UserEntity } from 'src/users/user.entity';
+import { SessionEntity } from 'src/session/session.entity';
+import { StatusEntity } from 'src/statuses/status.entity';
 
 @Injectable()
 export class AuthService {
@@ -85,10 +86,10 @@ export class AuthService {
       .update(randomStringGenerator())
       .digest('hex');
 
-    const session = await this.sessionService.create({
-      user,
-      hash,
-    });
+    const newSession = new SessionEntity();
+    newSession.user = user;
+    newSession.hash = hash;
+    const session = await this.sessionService.create(newSession);
 
     const { token, refreshToken, tokenExpires } = await this.getTokensData({
       id: user.id,
@@ -146,11 +147,11 @@ export class AuthService {
 
   async confirmEmail(hash: string): Promise<void> {
     this.logger.log(`Email confirmation process started for hash: ${hash}`);
-    let userId: User['id'];
+    let userId: UserEntity['id'];
 
     try {
       const jwtData = await this.jwtService.verifyAsync<{
-        confirmEmailUserId: User['id'];
+        confirmEmailUserId: UserEntity['id'];
       }>(hash, {
         secret: this.configService.getOrThrow('auth.confirmEmailSecret', {
           infer: true,
@@ -183,19 +184,19 @@ export class AuthService {
       });
     }
 
-    user.status = {
-      id: StatusEnum.active,
-    };
+    const userStatus = new StatusEntity();
+    userStatus.id = StatusEnum.active;
+    user.status = userStatus;
 
     await this.usersService.update(user.id, user);
     this.logger.log(`Successfully activated user account for id: ${userId}`);
   }
 
   private async getTokensData(data: {
-    id: User['id'];
-    role: User['role'];
-    sessionId: Session['id'];
-    hash: Session['hash'];
+    id: UserEntity['id'];
+    role: UserEntity['role'];
+    sessionId: SessionEntity['id'];
+    hash: SessionEntity['hash'];
   }) {
     const tokenExpiresIn = this.configService.getOrThrow('auth.expires', {
       infer: true,
