@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   HttpStatus,
   Injectable,
   Logger,
@@ -24,6 +25,7 @@ import ms from 'ms';
 import { UserEntity } from 'src/users/user.entity';
 import { SessionEntity } from 'src/session/session.entity';
 import { StatusEntity } from 'src/statuses/status.entity';
+import { CommonResponse } from 'src/utils/types/common.type';
 
 @Injectable()
 export class AuthService {
@@ -38,59 +40,75 @@ export class AuthService {
   ) {}
 
   async validateLogin(loginDto: AuthEmailLoginDto): Promise<LoginResponseDto> {
+    this.logger.log(`Login attempt for email: ${loginDto.email}`);
     const user = await this.usersService.findByEmail(loginDto.email);
 
+    // Check if user exists
     if (!user) {
-      throw new UnprocessableEntityException({
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-        errors: {
-          email: 'notFound',
-        },
+      this.logger.warn(
+        `Login failed - User not found for email: ${loginDto.email}`,
+      );
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'User not found with this email address',
       });
     }
 
+    // Check if user is using email provider
     if (user.provider !== String(AuthProvidersEnum.email)) {
-      throw new UnprocessableEntityException({
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-        errors: {
-          email: `needLoginViaProvider:${user.provider}`,
-        },
+      this.logger.warn(
+        `Login failed - User must login via ${user.provider} provider for email: ${loginDto.email}`,
+      );
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: `Please login using your ${user.provider} account`,
       });
     }
 
+    // Check if user has a password set
     if (!user.password) {
-      throw new UnprocessableEntityException({
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-        errors: {
-          password: 'incorrectPassword',
-        },
+      this.logger.warn(
+        `Login failed - No password set for email: ${loginDto.email}`,
+      );
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Password not set for this account',
       });
     }
 
+    // Validate password
     const isValidPassword = await bcrypt.compare(
       loginDto.password,
       user.password,
     );
 
     if (!isValidPassword) {
-      throw new UnprocessableEntityException({
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-        errors: {
-          password: 'incorrectPassword',
-        },
+      this.logger.warn(
+        `Login failed - Invalid password for email: ${loginDto.email}`,
+      );
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Invalid email or password',
       });
     }
 
+    // Generate session hash
+    this.logger.log(`Password validated successfully for user: ${user.id}`);
     const hash = crypto
       .createHash('sha256')
       .update(randomStringGenerator())
       .digest('hex');
 
+    // Create new session
     const newSession = new SessionEntity();
     newSession.user = user;
     newSession.hash = hash;
     const session = await this.sessionService.create(newSession);
+    this.logger.log(
+      `New session created with id: ${session.id} for user: ${user.id}`,
+    );
 
+    // Generate tokens
     const { token, refreshToken, tokenExpires } = await this.getTokensData({
       id: user.id,
       role: user.role,
@@ -98,6 +116,7 @@ export class AuthService {
       hash,
     });
 
+    this.logger.log(`Login successful for user: ${user.id}`);
     return {
       refreshToken,
       token,
@@ -106,7 +125,7 @@ export class AuthService {
     };
   }
 
-  async register(dto: AuthRegisterLoginDto): Promise<void> {
+  async register(dto: AuthRegisterLoginDto): Promise<CommonResponse<null>> {
     this.logger.log(`Register flow started for email: ${dto.email}`);
     const user = await this.usersService.create({
       ...dto,
@@ -143,6 +162,13 @@ export class AuthService {
       },
     });
     this.logger.log(`Sign up email sent to: ${dto.email}`);
+
+    return {
+      status: HttpStatus.OK,
+      message:
+        'User registered successfully. Please check your email to confirm.',
+      data: null,
+    };
   }
 
   async confirmEmail(hash: string): Promise<void> {

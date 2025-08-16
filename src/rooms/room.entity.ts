@@ -12,6 +12,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { UserEntity } from 'src/users/user.entity';
 
 @Entity({
   name: 'room',
@@ -22,6 +23,12 @@ export class RoomEntity extends EntityRelationalHelper {
   })
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @ApiProperty({
+    type: () => UserEntity,
+  })
+  @ManyToOne(() => UserEntity)
+  owner: UserEntity;
 
   @ApiProperty({
     type: () => HouseEntity,

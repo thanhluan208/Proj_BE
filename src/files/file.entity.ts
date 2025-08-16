@@ -10,7 +10,7 @@ import {
 } from 'typeorm';
 
 @Entity({ name: 'file' })
-export class File {
+export class FileEntity {
   @ApiProperty({
     type: String,
     example: 'cbcfa8b8-3a25-4adb-a9c6-e325f0d0f3ae',

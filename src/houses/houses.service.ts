@@ -14,6 +14,8 @@ import {
   PaginationInfoResponseDto,
 } from 'src/utils/dto/paginated-response.dto';
 import { HouseEntity } from './house.entity';
+import { StatusEnum } from 'src/statuses/statuses.enum';
+import { StatusEntity } from 'src/statuses/status.entity';
 
 @Injectable()
 export class HousesService {
@@ -40,9 +42,13 @@ export class HousesService {
       });
     }
 
+    const status = new StatusEntity();
+    status.id = StatusEnum.active;
+
     const house = await this.houseRepository.create({
       ...createHouseDto,
       owner: currentUser,
+      status,
     });
 
     return house;

@@ -21,13 +21,23 @@ import { RoomModule } from './rooms/room.module';
 import { SessionModule } from './session/session.module';
 import { TenantModule } from './tenant/tenant.module';
 import { UsersModule } from './users/users.module';
+import { ContractsModule } from './contracts/contracts.module';
+import redisConfig from './redis/config/redis.config';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
     // Configuration Module
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, mailConfig, authConfig, appConfig, minioConfig],
+      load: [
+        databaseConfig,
+        mailConfig,
+        authConfig,
+        appConfig,
+        minioConfig,
+        redisConfig,
+      ],
       envFilePath: '.env',
     }),
 
@@ -66,6 +76,8 @@ import { UsersModule } from './users/users.module';
       imports: [ConfigModule],
       inject: [ConfigService],
     }),
+
+    RedisModule,
     UsersModule,
     SessionModule,
     AuthModule,
@@ -76,6 +88,7 @@ import { UsersModule } from './users/users.module';
     RoomModule,
     TenantModule,
     FilesModule,
+    ContractsModule,
   ],
   controllers: [HealthController],
   providers: [],

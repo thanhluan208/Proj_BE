@@ -12,6 +12,7 @@ import { AuthConfirmEmailDto } from './dto/auth-confirm-email.dto';
 import { ApiOkResponse } from '@nestjs/swagger';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { AuthEmailLoginDto } from './dto/auth-email-login.dto';
+import { CommonResponse } from 'src/utils/types/common.type';
 
 @Controller('auth')
 export class AuthController {
@@ -30,8 +31,10 @@ export class AuthController {
   }
 
   @Post('email/register')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async register(@Body() dto: AuthRegisterLoginDto): Promise<void> {
+  @HttpCode(HttpStatus.OK)
+  async register(
+    @Body() dto: AuthRegisterLoginDto,
+  ): Promise<CommonResponse<null>> {
     return this.authService.register(dto);
   }
 

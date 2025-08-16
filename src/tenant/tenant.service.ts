@@ -194,4 +194,18 @@ export class TenantService {
     const totalPages = Math.ceil(total / pageSize);
     return { total, totalPages };
   }
+
+  async findById(id: string) {
+    this.logger.log(`Finding tenant with ID: ${id}`);
+
+    const tenant = await this.tenantRepository.findById(id);
+
+    if (!tenant) {
+      this.logger.warn(`Tenant not found with ID: ${id}`);
+      return null;
+    }
+
+    this.logger.log(`Found tenant with ID: ${id}`);
+    return tenant;
+  }
 }

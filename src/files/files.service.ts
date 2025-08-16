@@ -5,7 +5,7 @@ import { FileRepository } from './file.repository';
 import { ConfigService } from '@nestjs/config';
 import { AllConfigType } from 'src/config/config.type';
 import { InjectMinio } from './decorator/minio.decorator';
-import { File } from './file.entity';
+import { FileEntity } from './file.entity';
 
 @Injectable()
 export class FilesService {
@@ -36,7 +36,7 @@ export class FilesService {
       );
 
       // Save file metadata to database
-      const fileData: Partial<File> = {
+      const fileData: Partial<FileEntity> = {
         id: fileId,
         path: fileName,
         mimeType: file.mimetype,

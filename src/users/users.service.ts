@@ -25,10 +25,14 @@ export class UserService {
       createUserDto.email,
     );
     if (existing) {
-      this.logger.warn(
-        `Attempt to create user with existing email: ${createUserDto.email}`,
-      );
-      throw new BadRequestException('Email already exists');
+      if (existing.status?.id === StatusEnum.active) {
+        this.logger.warn(
+          `Attempt to create user with existing email: ${createUserDto.email}`,
+        );
+        throw new BadRequestException('Email already exists');
+      } else {
+        return existing;
+      }
     }
 
     let role: { id: string } | undefined = undefined;

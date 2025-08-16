@@ -76,6 +76,7 @@ export class RoomsService {
     const room = await this.roomsRepository.create({
       ...createRoomDto,
       house: house,
+      owner: currentUser,
     });
 
     this.logger.log(`Room created successfully with ID: ${room.id}`);

@@ -3,14 +3,14 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { FilesController } from './files.controller';
 import { FilesService } from './files.service';
 import { FileRepository } from './file.repository';
-import { File } from './file.entity';
+import { FileEntity } from './file.entity';
 import { ConfigService } from '@nestjs/config';
 import { MINIO_TOKEN } from './decorator/minio.decorator';
 import { AllConfigType } from 'src/config/config.type';
 import * as Minio from 'minio';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([File])],
+  imports: [TypeOrmModule.forFeature([FileEntity])],
   controllers: [FilesController],
   providers: [
     FilesService,
