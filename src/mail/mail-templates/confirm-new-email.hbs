@@ -3,28 +3,71 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{title}}</title>
 </head>
 
 <body style="margin:0;font-family:arial">
-    <table style="border:0;width:100%">
+    <table style="border:0;width:100%;max-width:600px;margin:0 auto">
+        <!-- Header -->
         <tr style="background:#eeeeee">
             <td style="padding:20px;color:#808080;text-align:center;font-size:40px;font-weight:600">
                 {{app_name}}
             </td>
         </tr>
+        
+        <!-- Main Content -->
         <tr>
-            <td style="padding:20px;color:#808080;font-size:16px;font-weight:100">
-                {{text1}}<br>
-                {{text2}}<br>
-                {{text3}}
+            <td style="padding:30px 20px;color:#333333;font-size:16px;line-height:1.6">
+                <h2 style="color:#00838f;margin-top:0;margin-bottom:20px;font-size:24px">Welcome to {{app_name}}!</h2>
+                
+                <p style="margin-bottom:15px">{{text1}}</p>
+                <p style="margin-bottom:15px">{{text2}}</p>
+                <p style="margin-bottom:25px">{{text3}}</p>
+                
+                <!-- OTP Code Section -->
+                <div style="background:#f8f9fa;border:2px solid #00838f;border-radius:8px;padding:25px;text-align:center;margin:25px 0">
+                    <h3 style="color:#00838f;margin-top:0;margin-bottom:15px;font-size:18px">Your Verification Code</h3>
+                    <div style="font-size:32px;font-weight:bold;color:#00838f;letter-spacing:8px;margin:15px 0;font-family:monospace">
+                        {{otpCode}}
+                    </div>
+                    <p style="color:#666666;font-size:14px;margin-bottom:0">
+                        This code will expire in <strong>5 minutes</strong>
+                    </p>
+                </div>
+                
+                <!-- Instructions -->
+                <div style="background:#fff3cd;border-left:4px solid #ffc107;padding:15px;margin:20px 0">
+                    <p style="margin:0;color:#856404;font-size:14px">
+                        <strong>Security Note:</strong> Never share this code with anyone. Our team will never ask for your verification code.
+                    </p>
+                </div>
+                
+                <p style="color:#666666;font-size:14px;margin-top:25px">
+                    If you didn't request this verification code, please ignore this email or contact our support team.
+                </p>
             </td>
         </tr>
+        
+        <!-- Alternative Action Button (Optional) -->
         <tr>
-            <td style="text-align:center">
-                <a href="{{url}}"
-                    style="display:inline-block;padding:20px;background:#00838f;text-decoration:none;color:#ffffff">{{actionTitle}}</a>
+            <td style="text-align:center;padding:20px">
+                <a href="{{url}}" 
+                   style="display:inline-block;padding:15px 30px;background:#00838f;text-decoration:none;color:#ffffff;border-radius:5px;font-weight:600;font-size:16px">
+                    {{actionTitle}}
+                </a>
+            </td>
+        </tr>
+        
+        <!-- Footer -->
+        <tr style="background:#f8f9fa">
+            <td style="padding:20px;text-align:center;color:#666666;font-size:12px;border-top:1px solid #dee2e6">
+                <p style="margin:0">
+                    This is an automated email from {{app_name}}. Please do not reply to this email.
+                </p>
+                <p style="margin:5px 0 0 0">
+                    © {{currentYear}} {{app_name}}. All rights reserved.
+                </p>
             </td>
         </tr>
     </table>

@@ -5,9 +5,13 @@ import { ConfigService } from '@nestjs/config';
 import { OrNeverType } from '../../utils/types/or-never.type';
 import { JwtPayloadType } from './types/jwt-payload.type';
 import { AllConfigType } from '../../config/config.type';
+import { AUTH_CONSTANTS } from 'src/utils/constant';
 
 @Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
+export class JwtStrategy extends PassportStrategy(
+  Strategy,
+  AUTH_CONSTANTS.jwt,
+) {
   constructor(configService: ConfigService<AllConfigType>) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),

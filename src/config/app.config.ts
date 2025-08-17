@@ -66,5 +66,23 @@ export default registerAs<AppConfig>('app', () => {
     apiPrefix: process.env.API_PREFIX || 'api',
     fallbackLanguage: process.env.APP_FALLBACK_LANGUAGE || 'en',
     headerLanguage: process.env.APP_HEADER_LANGUAGE || 'x-custom-lang',
+    otpExpiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || '5', 10),
+    otpResendLimit: parseInt(process.env.OTP_RESEND_LIMIT || '3', 10),
+    otpResendInterval: parseInt(
+      process.env.OTP_RESEND_INTERVAL_MINUTES || '5',
+      10,
+    ),
+    otpResendCooldownMinutes: parseInt(
+      process.env.OTP_RESEND_COOLDOWN_MINUTES || '15',
+      10,
+    ),
+    otpResendCooldownMaxMinutes: parseInt(
+      process.env.OTP_RESEND_COOLDOWN_MAX_MINUTES || '60',
+      10,
+    ),
+    otpMaxCooldownMinutes: parseInt(
+      process.env.OTP_MAX_COOLDOWN_MINUTES || '60',
+      10,
+    ),
   };
 });

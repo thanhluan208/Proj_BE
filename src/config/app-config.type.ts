@@ -8,4 +8,10 @@ export type AppConfig = {
   apiPrefix: string;
   fallbackLanguage: string;
   headerLanguage: string;
+  otpExpiryMinutes: number;
+  otpResendLimit: number;
+  otpResendInterval: number;
+  otpResendCooldownMinutes: number;
+  otpResendCooldownMaxMinutes: number;
+  otpMaxCooldownMinutes: number;
 };
