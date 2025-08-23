@@ -84,3 +84,19 @@ export const numberToVietnameseText = (num: number): string => {
 
   return convertNumber(num) + ' đồng';
 };
+
+// Safe getter using dot-paths (no external deps)
+export function getByPath(obj: unknown, path?: string): unknown {
+  // Fast return when path is empty
+  if (!obj || !path) return undefined;
+  // Split segments while skipping empties
+  const segs = path.split('.').filter(Boolean);
+  // Walk object step by step
+  let cur: any = obj;
+  for (const s of segs) {
+    if (cur == null) return undefined;
+    cur = cur[s];
+  }
+  // Return final value or undefined
+  return cur;
+}

@@ -9,4 +9,5 @@ export const REDIS_PREFIX_KEY = {
 export const AUTH_CONSTANTS = {
   jwtRefresh: 'jwt-refresh',
   jwt: 'jwt',
+  ownershipMetadataKey: 'ownership',
 };
