@@ -14,7 +14,4 @@ export class PaginatedResponseDto<T> {
 export class PaginationInfoResponseDto {
   @ApiProperty()
   total: number;
-
-  @ApiProperty()
-  totalPages: number;
 }

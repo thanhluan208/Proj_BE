@@ -4,6 +4,8 @@ export const REDIS_PREFIX_KEY = {
   otp: 'otp:',
   resendAttempts: 'resendAttempts:',
   resendCooldown: 'resendCooldown:',
+  user: 'user:',
+  house: 'house:',
 };
 
 export const AUTH_CONSTANTS = {

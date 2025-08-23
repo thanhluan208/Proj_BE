@@ -29,7 +29,7 @@ export class UserEntity extends EntityRelationalHelper {
     type: String,
     example: 'john.doe@example.com',
   })
-  @Expose({ groups: ['me', 'admin'] })
+  @Expose({ groups: ['admin'] })
   @Column({ type: String, unique: true, nullable: true })
   email: string | null;
 
@@ -41,7 +41,7 @@ export class UserEntity extends EntityRelationalHelper {
     type: String,
     example: 'email',
   })
-  @Expose({ groups: ['me', 'admin'] })
+  @Expose({ groups: ['admin'] })
   @Column({ default: AuthProvidersEnum.email })
   provider: string;
 
@@ -67,6 +67,7 @@ export class UserEntity extends EntityRelationalHelper {
   @ManyToOne(() => RoleEntity, {
     eager: true,
   })
+  @Expose({ groups: ['admin'] })
   role?: RoleEntity | null;
 
   @ApiProperty({
@@ -75,6 +76,7 @@ export class UserEntity extends EntityRelationalHelper {
   @ManyToOne(() => StatusEntity, {
     eager: true,
   })
+  @Expose({ groups: ['admin'] })
   status?: StatusEntity;
 
   @ApiProperty()
@@ -87,5 +89,6 @@ export class UserEntity extends EntityRelationalHelper {
 
   @ApiProperty()
   @DeleteDateColumn()
+  @Expose({ groups: ['admin'] })
   deletedAt: Date;
 }

@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Expose } from 'class-transformer';
 import { StatusEntity } from 'src/statuses/status.entity';
 import { UserEntity } from 'src/users/user.entity';
 import { EntityRelationalHelper } from 'src/utils/relational-entity-helper';
@@ -29,6 +30,7 @@ export class HouseEntity extends EntityRelationalHelper {
   @ManyToOne(() => UserEntity, {
     eager: true,
   })
+  @Expose({ groups: ['admin'] })
   owner: UserEntity;
 
   @ApiProperty({
@@ -52,6 +54,7 @@ export class HouseEntity extends EntityRelationalHelper {
   @ManyToOne(() => StatusEntity, {
     eager: true,
   })
+  @Expose({ groups: ['admin'] })
   status?: StatusEntity;
 
   @ApiProperty()
@@ -64,5 +67,6 @@ export class HouseEntity extends EntityRelationalHelper {
 
   @ApiProperty()
   @DeleteDateColumn()
+  @Expose({ groups: ['admin'] })
   deletedAt: Date;
 }

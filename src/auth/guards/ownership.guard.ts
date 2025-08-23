@@ -32,6 +32,7 @@ export class OwnershipGuard implements CanActivate {
     const user = req?.user;
 
     // Ensure authenticated
+
     if (!user?.id) throw new UnauthorizedException();
 
     // Extract target id
@@ -44,7 +45,7 @@ export class OwnershipGuard implements CanActivate {
 
     // Resolve repository dynamically
     const repo: Repository<any> = this.moduleRef.get(
-      `Repository<${options.entity.name}>`,
+      options.entity.name + 'Repository',
       {
         strict: false,
       },
@@ -63,7 +64,7 @@ export class OwnershipGuard implements CanActivate {
     if (!entity) throw new ForbiddenException('Resource not found');
 
     // Check ownership
-    if (String(entity[options.ownerField]) !== String(user.id)) {
+    if (String(entity[options.ownerField]?.id) !== String(user.id)) {
       throw new ForbiddenException('Not the owner');
     }
 

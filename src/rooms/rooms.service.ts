@@ -168,6 +168,6 @@ export class RoomsService {
     }
     // Count rooms
     const total = await this.roomsRepository.countByHouse(house.id);
-    return { total, totalPages: Math.ceil(total / (payload.pageSize || 10)) };
+    return { total };
   }
 }

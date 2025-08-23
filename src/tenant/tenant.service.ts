@@ -190,9 +190,7 @@ export class TenantService {
     }
     // 3. Count tenants
     const total = await this.tenantRepository.countByRoom(room.id);
-    const pageSize = payload.pageSize || 10;
-    const totalPages = Math.ceil(total / pageSize);
-    return { total, totalPages };
+    return { total };
   }
 
   async findById(id: string) {

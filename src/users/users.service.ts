@@ -13,11 +13,18 @@ import { RoleEnum } from 'src/roles/roles.enum';
 import { StatusEnum } from 'src/statuses/statuses.enum';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserEntity } from './user.entity';
+import { RedisService } from 'src/redis/redis.service';
+import { REDIS_PREFIX_KEY } from 'src/utils/constant';
 
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
-  constructor(private readonly usersRepository: UserRepository) {}
+  private readonly cacheUserInfoTTL = 3600; // Cache for 1 hour
+
+  constructor(
+    private readonly usersRepository: UserRepository,
+    private readonly redisService: RedisService,
+  ) {}
 
   async create(createUserDto: CreateUserDto): Promise<UserEntity> {
     this.logger.log(`Create user called for email: ${createUserDto.email}`);
@@ -92,8 +99,31 @@ export class UserService {
     return user;
   }
 
-  findById(id: string): Promise<UserEntity | null> {
-    return this.usersRepository.findById(id);
+  async findById(id: string): Promise<UserEntity> {
+    const user = await this.redisService.get(`${REDIS_PREFIX_KEY.user}${id}`);
+    if (user) {
+      this.logger.log(`User found in cache for ID: ${id}`);
+      return JSON.parse(user);
+    }
+
+    const queryUser = await this.usersRepository.findById(id);
+    if (queryUser) {
+      await this.redisService.set(
+        `${REDIS_PREFIX_KEY.user}${id}`,
+        JSON.stringify(queryUser),
+        this.cacheUserInfoTTL,
+      );
+      this.logger.log(`User cached for ID: ${id}`);
+      return queryUser;
+    } else {
+      this.logger.error(`User not found with ID: ${id}`);
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: {
+          user: 'userNotFound',
+        },
+      });
+    }
   }
 
   findByIds(ids: string[]): Promise<UserEntity[]> {
