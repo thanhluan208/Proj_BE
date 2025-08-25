@@ -20,7 +20,7 @@ async function bootstrap() {
   );
 
   // Enable CORS if needed
-  app.enableCors();
+  app.enableCors('*');
 
   // Swagger Configuration
   const config = new DocumentBuilder()

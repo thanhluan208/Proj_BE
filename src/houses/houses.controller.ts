@@ -79,7 +79,7 @@ export class HousesController {
     resourceIdParam: 'id',
   })
   findById(@Request() request): Promise<HouseEntity | null> {
-    return this.housesService.findById(request.params.id);
+    return this.housesService.findById(request.params.id, request.user.id);
   }
 
   @ApiCreatedResponse({

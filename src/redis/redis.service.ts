@@ -53,30 +53,6 @@ export class RedisService implements OnModuleDestroy {
   }
 
   /**
-   * Delete keys matching a pattern
-   * @param pattern - The pattern to match keys
-   * @param count - Number of keys to scan at a time (optional, default 100)
-   * @returns Promise<number> - Number of keys deleted
-   */
-  async delByPattern(pattern: string, count?: number): Promise<number> {
-    const stream = this.redis.scanStream({
-      match: pattern,
-      count: count || 100,
-    });
-    const keysToDelete: string[] = [];
-    return new Promise((resolve, reject) => {
-      stream.on('data', (keys: string[]) => {
-        if (keys.length) {
-          keysToDelete.push(...keys);
-          this.redis.del(...keys).catch(reject);
-        }
-      });
-      stream.on('end', () => resolve(keysToDelete.length));
-      stream.on('error', reject);
-    });
-  }
-
-  /**
    * Check if key exists
    * @param key - The key to check
    * @returns Promise<boolean> - True if key exists

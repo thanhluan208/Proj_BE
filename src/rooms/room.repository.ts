@@ -21,6 +21,15 @@ export class RoomRepository {
     });
   }
 
+  async findByIdAndOwner(
+    id: string,
+    owner_id: string,
+  ): Promise<RoomEntity | null> {
+    return await this.roomRepository.findOne({
+      where: { id, owner: { id: owner_id } },
+    });
+  }
+
   async findByIds(ids: string[]): Promise<RoomEntity[]> {
     return await this.roomRepository.find({
       where: { id: In(ids) },

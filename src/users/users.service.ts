@@ -20,6 +20,7 @@ import { REDIS_PREFIX_KEY } from 'src/utils/constant';
 export class UserService {
   private readonly logger = new Logger(UserService.name);
   private readonly cacheUserInfoTTL = 3600; // Cache for 1 hour
+  private readonly CACHE_USER_VERSION_KEY = `${REDIS_PREFIX_KEY.user}:version`;
 
   constructor(
     private readonly usersRepository: UserRepository,
@@ -100,7 +101,15 @@ export class UserService {
   }
 
   async findById(id: string): Promise<UserEntity> {
-    const user = await this.redisService.get(`${REDIS_PREFIX_KEY.user}${id}`);
+    this.logger.log(`Finding user with ID: ${id}`);
+
+    const userCacheVersion =
+      (await this.redisService.get(`${this.CACHE_USER_VERSION_KEY}:${id}`)) ??
+      '0';
+
+    const key = `${REDIS_PREFIX_KEY.user}:${id}:v${userCacheVersion}`;
+
+    const user = await this.redisService.get(key);
     if (user) {
       this.logger.log(`User found in cache for ID: ${id}`);
       return JSON.parse(user);
@@ -109,7 +118,7 @@ export class UserService {
     const queryUser = await this.usersRepository.findById(id);
     if (queryUser) {
       await this.redisService.set(
-        `${REDIS_PREFIX_KEY.user}${id}`,
+        key,
         JSON.stringify(queryUser),
         this.cacheUserInfoTTL,
       );
@@ -138,9 +147,6 @@ export class UserService {
     id: string,
     updateUserDto: UpdateUserDto,
   ): Promise<UserEntity | null> {
-    // Do not remove comment below.
-    // <updating-property />
-
     let password: string | undefined = undefined;
 
     if (updateUserDto.password) {

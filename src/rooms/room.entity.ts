@@ -13,6 +13,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { UserEntity } from 'src/users/user.entity';
+import { Expose } from 'class-transformer';
 
 @Entity({
   name: 'room',
@@ -28,6 +29,7 @@ export class RoomEntity extends EntityRelationalHelper {
     type: () => UserEntity,
   })
   @ManyToOne(() => UserEntity)
+  @Expose({ groups: ['admin'] })
   owner: UserEntity;
 
   @ApiProperty({
@@ -60,6 +62,7 @@ export class RoomEntity extends EntityRelationalHelper {
   @ManyToOne(() => StatusEntity, {
     eager: true,
   })
+  @Expose({ groups: ['admin'] })
   status?: StatusEntity;
 
   @ApiProperty({

@@ -22,8 +22,8 @@ import { HouseRepository } from './house.repository';
 @Injectable()
 export class HousesService {
   private readonly logger = new Logger(HousesService.name);
-  private readonly cacheHouseInfoTTL = 3600; // Cache for 1 hour
-  private readonly cacheHousesTotalTTL = 86400; // Cache for 24 hours
+  private readonly CACHE_HOUSE_TTL = 60 * 15; // Cache for 15 minutes
+  private readonly CACHE_HOUSE_VERSION_KEY = `${REDIS_PREFIX_KEY.house}:version`;
 
   constructor(
     private readonly redisService: RedisService,
@@ -43,6 +43,14 @@ export class HousesService {
       status,
     });
 
+    const houseCacheVersion = await this.redisService.get(
+      `${this.CACHE_HOUSE_VERSION_KEY}:${currentUser.id}`,
+    );
+
+    const cachedKey = `${REDIS_PREFIX_KEY.house}:${currentUser.id}:total:v${houseCacheVersion}`;
+
+    await this.redisService.del(cachedKey);
+
     return house;
   }
 
@@ -61,30 +69,36 @@ export class HousesService {
       ...updateHouseDto,
     });
     // Invalidate cache
-    await this.redisService.delByPattern(`${REDIS_PREFIX_KEY.house}*`);
+    await this.redisService.incr(
+      `${this.CACHE_HOUSE_VERSION_KEY}:${house.owner.id}`,
+    );
     return updatedHouse;
   }
 
-  async findById(id: string) {
+  async findById(id: string, userId: string) {
     this.logger.log(`Finding house with ID: ${id}`);
     let house: HouseEntity | null = null;
+    const houseCacheVersion =
+      (await this.redisService.get(
+        `${this.CACHE_HOUSE_VERSION_KEY}:${userId}`,
+      )) ?? '0';
 
-    const cachedHouse = await this.redisService.get(
-      `${REDIS_PREFIX_KEY.house}${id}`,
-    );
+    const key = `${REDIS_PREFIX_KEY.house}:${id}:${userId}:v${houseCacheVersion}`;
+
+    const cachedHouse = await this.redisService.get(key);
 
     if (cachedHouse) {
       this.logger.log(`House found in cache for ID: ${id}`);
       house = JSON.parse(cachedHouse) as HouseEntity;
     } else {
       this.logger.log(`House not found in cache for ID: ${id}`);
-      house = await this.houseRepository.findById(id);
+      house = await this.houseRepository.findByIdAndOwner(id, userId);
 
       if (house) {
         await this.redisService.set(
-          `${REDIS_PREFIX_KEY.house}${id}`,
+          key,
           JSON.stringify(house),
-          this.cacheHouseInfoTTL,
+          this.CACHE_HOUSE_TTL,
         );
         this.logger.log(`House cached for ID: ${id}`);
       } else {
@@ -112,14 +126,19 @@ export class HousesService {
   ): Promise<PaginatedResponseDto<HouseEntity>> {
     this.logger.log(`Finding houses for user ${user_id}`);
 
+    const houseCacheVersion =
+      (await this.redisService.get(
+        `${this.CACHE_HOUSE_VERSION_KEY}:${user_id}`,
+      )) ?? '0';
+
     const { page = 1, pageSize = 10 } = paginationDto;
     const skip = (page - 1) * pageSize;
 
+    const cacheKey = `${REDIS_PREFIX_KEY.house}:${user_id}:${page}:${pageSize}:v${houseCacheVersion}`;
+
     let houses: HouseEntity[] = [];
 
-    const cachedHouses = await this.redisService.get(
-      `${REDIS_PREFIX_KEY.house}${user_id}:${page}:${pageSize}`,
-    );
+    const cachedHouses = await this.redisService.get(cacheKey);
 
     if (cachedHouses) {
       this.logger.log(
@@ -136,11 +155,12 @@ export class HousesService {
         take: pageSize,
       });
 
-      if (houses.length > 0) {
+      // Cache the houses if found. However we don't cache the last page if it's not full since it may change due to new houses being added.
+      if (houses.length > 0 && houses.length === pageSize) {
         await this.redisService.set(
-          `${REDIS_PREFIX_KEY.house}${user_id}:${page}:${pageSize}`,
+          cacheKey,
           JSON.stringify(houses),
-          this.cacheHouseInfoTTL,
+          this.CACHE_HOUSE_TTL,
         );
         this.logger.log(
           `Houses cached for user ${user_id}, page ${page}, pageSize ${pageSize}`,
@@ -169,9 +189,14 @@ export class HousesService {
   async countByUser(user_id: string): Promise<PaginationInfoResponseDto> {
     let total = 0;
 
-    const cachedTotal = await this.redisService.get(
-      `${REDIS_PREFIX_KEY.house}${user_id}:total`,
-    );
+    const houseCacheVersion =
+      (await this.redisService.get(
+        `${this.CACHE_HOUSE_VERSION_KEY}:${user_id}`,
+      )) ?? '0';
+
+    const cachedKey = `${REDIS_PREFIX_KEY.house}:${user_id}:total:v${houseCacheVersion}`;
+
+    const cachedTotal = await this.redisService.get(cachedKey);
 
     if (cachedTotal) {
       this.logger.log(`Total houses found in cache for user ${user_id}`);
@@ -182,9 +207,9 @@ export class HousesService {
 
       if (total) {
         await this.redisService.set(
-          `${REDIS_PREFIX_KEY.house}${user_id}:total`,
+          cachedKey,
           JSON.stringify(total),
-          this.cacheHousesTotalTTL,
+          this.CACHE_HOUSE_TTL,
         );
         this.logger.log(`Total houses cached for user ${user_id}`);
       } else {

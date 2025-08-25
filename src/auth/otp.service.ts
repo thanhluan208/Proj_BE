@@ -49,7 +49,7 @@ export class OtpService {
     const ttlSeconds = otpExpiryMinutes * 60; // Convert minutes to seconds
 
     await this.redisService.set(
-      `${REDIS_PREFIX_KEY.otp}${email}`,
+      `${REDIS_PREFIX_KEY.otp}:${email}`,
       otpCode,
       ttlSeconds,
     );
@@ -66,7 +66,7 @@ export class OtpService {
    */
   async verifyOtp(email: string, providedOtp: string): Promise<boolean> {
     const storedOtp = await this.redisService.get(
-      `${REDIS_PREFIX_KEY.otp}${email}`,
+      `${REDIS_PREFIX_KEY.otp}:${email}`,
     );
 
     if (!storedOtp) {
@@ -81,7 +81,7 @@ export class OtpService {
     if (isValid) {
       this.logger.log(`OTP verification successful for email: ${email}`);
       // Delete OTP after successful verification to prevent reuse
-      await this.redisService.del(`${REDIS_PREFIX_KEY.otp}${email}`);
+      await this.redisService.del(`${REDIS_PREFIX_KEY.otp}:${email}`);
     } else {
       this.logger.warn(
         `OTP verification failed - Invalid OTP for email: ${email}`,
@@ -173,7 +173,7 @@ export class OtpService {
     email: string,
     ttlSeconds: number = 300, // 5 minutes default
   ): Promise<number> {
-    const key = `${REDIS_PREFIX_KEY.resendAttempts}${email}`;
+    const key = `${REDIS_PREFIX_KEY.resendAttempts}:${email}`;
     const newCount = await this.redisService.incr(key);
 
     // Set expiration only for the first attempt
@@ -190,7 +190,7 @@ export class OtpService {
    */
   async resetOtpData(email: string): Promise<void> {
     await Promise.all([
-      this.redisService.del(`${REDIS_PREFIX_KEY.otp}${email}`),
+      this.redisService.del(`${REDIS_PREFIX_KEY.otp}:${email}`),
       this.resetResendLimits(email),
     ]);
 
@@ -229,7 +229,7 @@ export class OtpService {
    * @returns Promise<number> - Current attempt count
    */
   async getResendAttempts(email: string): Promise<number> {
-    const key = `${REDIS_PREFIX_KEY.resendAttempts}${email}`;
+    const key = `${REDIS_PREFIX_KEY.resendAttempts}:${email}`;
     const attempts = await this.redisService.get(key);
     return attempts ? parseInt(attempts, 10) : 0;
   }
@@ -244,7 +244,7 @@ export class OtpService {
     cooldownSeconds: number,
   ): Promise<void> {
     await this.redisService.set(
-      `${REDIS_PREFIX_KEY.resendCooldown}${email}`,
+      `${REDIS_PREFIX_KEY.resendCooldown}:${email}`,
       'cooldown',
       cooldownSeconds,
     );
@@ -256,7 +256,7 @@ export class OtpService {
    * @returns Promise<number> - Remaining cooldown time in seconds, 0 if no cooldown
    */
   async getResendCooldown(email: string): Promise<number> {
-    const key = `${REDIS_PREFIX_KEY.resendCooldown}${email}`;
+    const key = `${REDIS_PREFIX_KEY.resendCooldown}:${email}`;
     const ttl = await this.redisService.ttl(key);
     return ttl > 0 ? ttl : 0;
   }
@@ -266,8 +266,8 @@ export class OtpService {
    * @param email - User's email address
    */
   async resetResendLimits(email: string): Promise<void> {
-    const attemptsKey = `${REDIS_PREFIX_KEY.resendAttempts}${email}`;
-    const cooldownKey = `${REDIS_PREFIX_KEY.resendCooldown}${email}`;
+    const attemptsKey = `${REDIS_PREFIX_KEY.resendAttempts}:${email}`;
+    const cooldownKey = `${REDIS_PREFIX_KEY.resendCooldown}:${email}`;
     await this.redisService.del(attemptsKey, cooldownKey);
   }
 }

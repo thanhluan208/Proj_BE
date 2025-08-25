@@ -29,7 +29,6 @@ export class UserEntity extends EntityRelationalHelper {
     type: String,
     example: 'john.doe@example.com',
   })
-  @Expose({ groups: ['admin'] })
   @Column({ type: String, unique: true, nullable: true })
   email: string | null;
 

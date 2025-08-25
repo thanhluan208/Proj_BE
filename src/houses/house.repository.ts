@@ -67,6 +67,15 @@ export class HouseRepository {
     return await this.houseRepository.save(entity);
   }
 
+  async findByIdAndOwner(id: string, owner_id: string) {
+    return await this.houseRepository.findOne({
+      where: {
+        id,
+        owner: { id: owner_id },
+      },
+    });
+  }
+
   async remove(id: string): Promise<void> {
     await this.houseRepository.softDelete(id);
   }

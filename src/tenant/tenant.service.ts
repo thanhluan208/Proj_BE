@@ -50,7 +50,10 @@ export class TenantService {
     this.logger.log(
       `Checking if house exists with ID: ${createTenantDto.house}`,
     );
-    const house = await this.housesService.findById(createTenantDto.house);
+    const house = await this.housesService.findById(
+      createTenantDto.house,
+      currentUser.id,
+    );
 
     if (!house) {
       this.logger.error(`House not found with ID: ${createTenantDto.house}`);
@@ -80,7 +83,10 @@ export class TenantService {
     }
 
     this.logger.log(`Checking if room exists with ID: ${createTenantDto.room}`);
-    const room = await this.roomsService.findById(createTenantDto.room);
+    const room = await this.roomsService.findById(
+      createTenantDto.room,
+      currentUser.id,
+    );
 
     if (!room) {
       this.logger.error(`Room not found with ID: ${createTenantDto.room}`);
@@ -125,11 +131,11 @@ export class TenantService {
   }
 
   async findByRoom(
-    user_id: string,
+    userId: string,
     payload: GetTenantDto,
   ): Promise<PaginatedResponseDto<TenantEntity>> {
     // 1. Find the room
-    const room = await this.roomsService.findById(payload.room);
+    const room = await this.roomsService.findById(payload.room, userId);
     if (!room) {
       this.logger.error(`Room not found with ID: ${payload.room}`);
       throw new UnprocessableEntityException({
@@ -139,9 +145,9 @@ export class TenantService {
     }
     // 2. Get the house and check ownership
     const house = room.house;
-    if (!house || house.owner?.id !== user_id) {
+    if (!house || house.owner?.id !== userId) {
       this.logger.error(
-        `User ${user_id} is not the owner of house ${house?.id}`,
+        `User ${userId} is not the owner of house ${house?.id}`,
       );
       throw new UnprocessableEntityException({
         status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -165,11 +171,11 @@ export class TenantService {
   }
 
   async countByRoom(
-    user_id: string,
+    userId: string,
     payload: GetTenantDto,
   ): Promise<PaginationInfoResponseDto> {
     // 1. Find the room
-    const room = await this.roomsService.findById(payload.room);
+    const room = await this.roomsService.findById(payload.room, userId);
     if (!room) {
       this.logger.error(`Room not found with ID: ${payload.room}`);
       throw new UnprocessableEntityException({
@@ -179,9 +185,9 @@ export class TenantService {
     }
     // 2. Get the house and check ownership
     const house = room.house;
-    if (!house || house.owner?.id !== user_id) {
+    if (!house || house.owner?.id !== userId) {
       this.logger.error(
-        `User ${user_id} is not the owner of house ${house?.id}`,
+        `User ${userId} is not the owner of house ${house?.id}`,
       );
       throw new UnprocessableEntityException({
         status: HttpStatus.UNPROCESSABLE_ENTITY,

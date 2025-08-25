@@ -4,13 +4,19 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiCreatedResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { RoomsService } from './rooms.service';
 import { RoomEntity } from './room.entity';
 import { CreateRoomDto } from './dto/create-room.dto';
@@ -51,12 +57,13 @@ export class RoomsController {
   @ApiCreatedResponse({
     type: PaginationInfoResponseDto,
   })
-  @Get('paging')
+  @Get(':id/paging')
+  @ApiParam({ name: 'id', type: String, description: 'The ID of the house' })
   @HttpCode(HttpStatus.OK)
   countByHouse(
     @Request() request,
-    @Query() query: GetRoomsDto,
+    @Param() { id }: { id: string },
   ): Promise<PaginationInfoResponseDto> {
-    return this.roomsService.countByHouse(request.user.id, query);
+    return this.roomsService.countByHouse(request.user.id, id);
   }
 }

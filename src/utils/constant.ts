@@ -1,11 +1,12 @@
 export const REDIS_CLIENT = 'REDIS_CLIENT';
 
 export const REDIS_PREFIX_KEY = {
-  otp: 'otp:',
-  resendAttempts: 'resendAttempts:',
-  resendCooldown: 'resendCooldown:',
-  user: 'user:',
-  house: 'house:',
+  otp: 'otp',
+  resendAttempts: 'resendAttempts',
+  resendCooldown: 'resendCooldown',
+  user: 'user',
+  house: 'house',
+  room: 'room',
 };
 
 export const AUTH_CONSTANTS = {

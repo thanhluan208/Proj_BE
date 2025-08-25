@@ -92,7 +92,7 @@ export class ContractsService {
     }
 
     // Validate room exists
-    const room = await this.roomService.findById(roomId);
+    const room = await this.roomService.findById(roomId, ownerId);
     this.logger.log(`Retrieved room: ${room?.id || 'not found'}`);
 
     if (!room) {
