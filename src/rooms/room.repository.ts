@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, In } from 'typeorm';
+import { StatusEnum } from 'src/statuses/statuses.enum';
 import { RoomEntity } from './room.entity';
 
 @Injectable()
@@ -26,7 +27,7 @@ export class RoomRepository {
     owner_id: string,
   ): Promise<RoomEntity | null> {
     return await this.roomRepository.findOne({
-      where: { id, owner: { id: owner_id } },
+      where: { id, house: { owner: { id: owner_id } } },
     });
   }
 
@@ -44,6 +45,7 @@ export class RoomRepository {
       where: {
         house: { id: house_id },
         deletedAt: IsNull(),
+        status: { id: StatusEnum.active },
       },
       skip: options?.skip,
       take: options?.take,
@@ -55,6 +57,7 @@ export class RoomRepository {
       where: {
         house: { id: house_id },
         deletedAt: IsNull(),
+        status: { id: StatusEnum.active },
       },
     });
   }

@@ -24,44 +24,18 @@ export class CreateRoomDto {
   description?: string;
 
   @ApiProperty({
+    example: 20.5,
+    type: Number,
+    description: 'Room size in square meters',
+  })
+  @IsNumber()
+  size_sq_m: number;
+
+  @ApiProperty({
     example: 5000000,
     type: Number,
-    description: 'Room price in VND',
+    description: 'Base rent in VND',
   })
   @IsNumber()
-  price: number;
-
-  @ApiProperty({
-    example: 200000,
-    type: Number,
-    description: 'Electronic fee in VND',
-  })
-  @IsNumber()
-  electronic_fee: number;
-
-  @ApiProperty({
-    example: 150000,
-    type: Number,
-    description: 'Water fee in VND',
-  })
-  @IsNumber()
-  water_fee: number;
-
-  @ApiProperty({
-    example: 300000,
-    type: Number,
-    description: 'Living fee in VND',
-  })
-  @IsNumber()
-  living_fee: number;
-
-  @ApiProperty({
-    example: 100000,
-    type: Number,
-    description: 'Other fees in VND',
-    nullable: true,
-  })
-  @IsOptional()
-  @IsNumber()
-  other_fee?: number;
+  base_rent: number;
 }

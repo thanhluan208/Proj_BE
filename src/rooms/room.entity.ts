@@ -12,7 +12,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { UserEntity } from 'src/users/user.entity';
 import { Expose } from 'class-transformer';
 
 @Entity({
@@ -25,13 +24,7 @@ export class RoomEntity extends EntityRelationalHelper {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ApiProperty({
-    type: () => UserEntity,
-  })
-  @ManyToOne(() => UserEntity)
-  @Expose({ groups: ['admin'] })
-  owner: UserEntity;
-
+  @Index()
   @ApiProperty({
     type: () => HouseEntity,
   })
@@ -67,44 +60,19 @@ export class RoomEntity extends EntityRelationalHelper {
 
   @ApiProperty({
     type: Number,
+    example: 20.5,
+    description: 'Room size in square meters',
+  })
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  size_sq_m: number;
+
+  @ApiProperty({
+    type: Number,
     example: 5000000,
-    description: 'Room price in VND',
+    description: 'Base rent in VND',
   })
   @Column({ type: 'decimal', precision: 15, scale: 2 })
-  price: number;
-
-  @ApiProperty({
-    type: Number,
-    example: 200000,
-    description: 'Electronic fee in VND',
-  })
-  @Column({ type: 'decimal', precision: 15, scale: 2 })
-  electronic_fee: number;
-
-  @ApiProperty({
-    type: Number,
-    example: 150000,
-    description: 'Water fee in VND',
-  })
-  @Column({ type: 'decimal', precision: 15, scale: 2 })
-  water_fee: number;
-
-  @ApiProperty({
-    type: Number,
-    example: 300000,
-    description: 'Living fee in VND',
-  })
-  @Column({ type: 'decimal', precision: 15, scale: 2 })
-  living_fee: number;
-
-  @ApiProperty({
-    type: Number,
-    example: 100000,
-    description: 'Other fees in VND',
-    nullable: true,
-  })
-  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
-  other_fee?: number;
+  base_rent: number;
 
   @ApiProperty()
   @CreateDateColumn()

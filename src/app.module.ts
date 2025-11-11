@@ -19,9 +19,10 @@ import { MailModule } from './mail/mail.module';
 import { MailerModule } from './mailer/mailer.module';
 import { RoomModule } from './rooms/room.module';
 import { SessionModule } from './session/session.module';
+import { HouseExpensesModule } from './house-expenses/house-expenses.module';
+import { RoomExpensesModule } from './room-expenses/room-expenses.module';
 import { TenantModule } from './tenant/tenant.module';
 import { UsersModule } from './users/users.module';
-import { ContractsModule } from './contracts/contracts.module';
 import redisConfig from './redis/config/redis.config';
 import { RedisModule } from './redis/redis.module';
 
@@ -88,7 +89,9 @@ import { RedisModule } from './redis/redis.module';
     RoomModule,
     TenantModule,
     FilesModule,
-    ContractsModule,
+    // ContractsModule,
+    HouseExpensesModule,
+    RoomExpensesModule,
   ],
   controllers: [HealthController],
   providers: [],

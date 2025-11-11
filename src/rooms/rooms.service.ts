@@ -58,7 +58,6 @@ export class RoomsService {
     const room = await this.roomsRepository.create({
       ...createRoomDto,
       house: house,
-      owner: currentUser,
     });
 
     await this.redisService.incr(

@@ -1,7 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Expose } from 'class-transformer';
-import { StatusEntity } from 'src/statuses/status.entity';
-import { UserEntity } from 'src/users/user.entity';
 import { EntityRelationalHelper } from 'src/utils/relational-entity-helper';
 import {
   Column,
@@ -13,11 +10,12 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { RoomEntity } from 'src/rooms/room.entity';
 
 @Entity({
-  name: 'house',
+  name: 'room_expense',
 })
-export class HouseEntity extends EntityRelationalHelper {
+export class RoomExpenseEntity extends EntityRelationalHelper {
   @ApiProperty({
     type: String,
   })
@@ -26,37 +24,37 @@ export class HouseEntity extends EntityRelationalHelper {
 
   @Index()
   @ApiProperty({
-    type: () => UserEntity,
+    type: () => RoomEntity,
+    description: 'Room this expense belongs to',
   })
-  @ManyToOne(() => UserEntity, {
+  @ManyToOne(() => RoomEntity, {
     eager: true,
+    onDelete: 'CASCADE',
   })
-  @Expose({ groups: ['admin'] })
-  owner: UserEntity;
+  room: RoomEntity;
 
   @ApiProperty({
     type: String,
-    example: 'My house',
+    example: 'light bulb replacement',
   })
-  @Index()
-  @Column({ type: String })
+  @Column({ type: 'text' })
   name: string;
 
   @ApiProperty({
-    type: String,
-    example: `My house's description`,
+    type: Number,
+    example: 50000,
+    description: 'Expense amount (numeric)',
   })
-  @Column({ type: String, nullable: true })
-  description?: string;
+  @Column({ type: 'decimal', precision: 15, scale: 2 })
+  amount: number;
 
   @ApiProperty({
-    type: () => StatusEntity,
+    type: String,
+    example: '2025-06-01',
+    description: 'Date of the expense',
   })
-  @ManyToOne(() => StatusEntity, {
-    eager: true,
-  })
-  @Expose({ groups: ['admin'] })
-  status?: StatusEntity;
+  @Column({ type: 'date' })
+  date: string;
 
   @ApiProperty()
   @CreateDateColumn()
@@ -68,6 +66,5 @@ export class HouseEntity extends EntityRelationalHelper {
 
   @ApiProperty()
   @DeleteDateColumn()
-  @Expose({ groups: ['admin'] })
   deletedAt: Date;
 }
