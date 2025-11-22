@@ -15,6 +15,7 @@ import {
   PaginationInfoResponseDto,
 } from 'src/utils/dto/paginated-response.dto';
 import { CreateRoomDto } from './dto/create-room.dto';
+import { UpdateRoomDto } from './dto/update-room.dto';
 import { GetRoomsDto } from './dto/get-rooms.dto';
 import { RoomEntity } from './room.entity';
 import { RoomRepository } from './room.repository';
@@ -55,6 +56,49 @@ export class RoomsService {
       `House owner ID: ${house.owner?.id}, Current user ID: ${currentUser.id}`,
     );
 
+    // Validation
+    const {
+      price_per_electricity_unit = 0,
+      fixed_electricity_fee = 0,
+      price_per_water_unit = 0,
+      fixed_water_fee = 0,
+      base_rent,
+      living_fee,
+      parking_fee,
+      cleaning_fee,
+    } = createRoomDto;
+
+    if (
+      Number(price_per_electricity_unit) <= 0 &&
+      Number(fixed_electricity_fee) <= 0
+    ) {
+      throw new BadRequestException(
+        'Either price_per_electricity_unit or fixed_electricity_fee must be greater than 0',
+      );
+    }
+
+    if (Number(price_per_water_unit) <= 0 && Number(fixed_water_fee) <= 0) {
+      throw new BadRequestException(
+        'Either price_per_water_unit or fixed_water_fee must be greater than 0',
+      );
+    }
+
+    if (Number(base_rent) <= 0) {
+      throw new BadRequestException('base_rent must be greater than 0');
+    }
+
+    if (living_fee !== undefined && Number(living_fee) <= 0) {
+      throw new BadRequestException('living_fee must be greater than 0');
+    }
+
+    if (parking_fee !== undefined && Number(parking_fee) <= 0) {
+      throw new BadRequestException('parking_fee must be greater than 0');
+    }
+
+    if (cleaning_fee !== undefined && Number(cleaning_fee) <= 0) {
+      throw new BadRequestException('cleaning_fee must be greater than 0');
+    }
+
     const room = await this.roomsRepository.create({
       ...createRoomDto,
       house: house,
@@ -70,7 +114,7 @@ export class RoomsService {
 
   async update(
     id: string,
-    updateRoomDto: Partial<CreateRoomDto>,
+    updateRoomDto: UpdateRoomDto,
     userId: string,
   ): Promise<RoomEntity | null> {
     const room = await this.findById(id, userId);

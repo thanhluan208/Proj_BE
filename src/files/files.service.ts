@@ -81,6 +81,49 @@ export class FilesService {
     }
   }
 
+  async uploadBuffer(
+    buffer: Buffer,
+    filename: string,
+    mimeType: string,
+    ownerId?: string,
+  ) {
+    const fileId = randomUUID();
+    const fileExtension = this.getFileExtension(filename);
+    const fileName = `${fileId}${fileExtension}`;
+    const bucketname = this.configService.getOrThrow('minio.bucketName', {
+      infer: true,
+    });
+
+    try {
+      // Upload to MinIO
+      await this.minioService.putObject(
+        bucketname,
+        fileName,
+        buffer,
+        buffer.length,
+        {
+          'Content-Type': mimeType,
+        },
+      );
+
+      // Save file metadata to database
+      const fileData: Partial<FileEntity> = {
+        id: fileId,
+        path: fileName,
+        mimeType: mimeType,
+        size: buffer.length,
+        originalName: filename,
+        owner: ownerId ? ({ id: ownerId } as any) : undefined,
+      };
+
+      const savedFile = await this.fileRepository.create(fileData);
+
+      return savedFile;
+    } catch (error) {
+      throw new BadRequestException(`Failed to upload file: ${error.message}`);
+    }
+  }
+
   async getFile(id: string) {
     const file = await this.fileRepository.findById(id);
     if (!file) {

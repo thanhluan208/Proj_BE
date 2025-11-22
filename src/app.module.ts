@@ -7,7 +7,9 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 import { AuthModule } from './auth/auth.module';
 import authConfig from './auth/config/auth.config';
 import appConfig from './config/app.config';
+import { ContractsModule } from './contracts/contracts.module';
 import { AllConfigType } from './config/config.type';
+import { BillingModule } from './billing/billing.module';
 import databaseConfig from './database/config/database.config';
 import { TypeOrmConfigService } from './database/typeorm-config.service';
 import { FilesModule } from './files/files.module';
@@ -89,9 +91,10 @@ import { RedisModule } from './redis/redis.module';
     RoomModule,
     TenantModule,
     FilesModule,
-    // ContractsModule,
     HouseExpensesModule,
     RoomExpensesModule,
+    BillingModule,
+    ContractsModule,
   ],
   controllers: [HealthController],
   providers: [],

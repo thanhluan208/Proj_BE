@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   Request,
@@ -20,6 +21,7 @@ import {
 import { RoomsService } from './rooms.service';
 import { RoomEntity } from './room.entity';
 import { CreateRoomDto } from './dto/create-room.dto';
+import { UpdateRoomDto } from './dto/update-room.dto';
 import {
   PaginatedResponseDto,
   PaginationInfoResponseDto,
@@ -40,6 +42,20 @@ export class RoomsController {
   @HttpCode(HttpStatus.CREATED)
   create(@Request() request, @Body() body: CreateRoomDto): Promise<RoomEntity> {
     return this.roomsService.create(body, request.user);
+  }
+
+  @ApiCreatedResponse({
+    type: RoomEntity,
+  })
+  @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiParam({ name: 'id', type: String, description: 'Room ID' })
+  update(
+    @Param('id') id: string,
+    @Request() request,
+    @Body() body: UpdateRoomDto,
+  ): Promise<RoomEntity | null> {
+    return this.roomsService.update(id, body, request.user.id);
   }
 
   @ApiCreatedResponse({

@@ -74,6 +74,55 @@ export class RoomEntity extends EntityRelationalHelper {
   @Column({ type: 'decimal', precision: 15, scale: 2 })
   base_rent: number;
 
+  @ApiProperty({
+    type: Number,
+    example: 3000,
+  })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  price_per_electricity_unit: number;
+
+  @ApiProperty({
+    type: Number,
+    example: 10000,
+  })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  price_per_water_unit: number;
+
+  @ApiProperty({
+    type: Number,
+    example: 50000,
+  })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  fixed_water_fee: number;
+
+  @ApiProperty({
+    type: Number,
+    example: 50000,
+  })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  fixed_electricity_fee: number;
+
+  @ApiProperty({
+    type: Number,
+    example: 100000,
+  })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  living_fee: number;
+
+  @ApiProperty({
+    type: Number,
+    example: 100000,
+  })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  parking_fee: number;
+
+  @ApiProperty({
+    type: Number,
+    example: 50000,
+  })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  cleaning_fee: number;
+
   @ApiProperty()
   @CreateDateColumn()
   createdAt: Date;

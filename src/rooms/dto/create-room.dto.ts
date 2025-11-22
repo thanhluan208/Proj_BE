@@ -38,4 +38,39 @@ export class CreateRoomDto {
   })
   @IsNumber()
   base_rent: number;
+
+  @ApiProperty({ example: 3000 })
+  @IsOptional()
+  @IsNumber()
+  price_per_electricity_unit?: number;
+
+  @ApiProperty({ example: 10000 })
+  @IsOptional()
+  @IsNumber()
+  price_per_water_unit?: number;
+
+  @ApiProperty({ example: 50000 })
+  @IsOptional()
+  @IsNumber()
+  fixed_water_fee?: number;
+
+  @ApiProperty({ example: 50000 })
+  @IsOptional()
+  @IsNumber()
+  fixed_electricity_fee?: number;
+
+  @ApiProperty({ example: 100000 })
+  @IsOptional()
+  @IsNumber()
+  living_fee?: number;
+
+  @ApiProperty({ example: 100000 })
+  @IsOptional()
+  @IsNumber()
+  parking_fee?: number;
+
+  @ApiProperty({ example: 50000 })
+  @IsOptional()
+  @IsNumber()
+  cleaning_fee?: number;
 }
