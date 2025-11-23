@@ -81,6 +81,81 @@ export class FilesService {
     }
   }
 
+  async uploadFileWithCustomPath(
+    file: Express.Multer.File,
+    customPath: string,
+    ownerId?: string,
+  ) {
+    // Validate file
+    this.validateFile(file);
+
+    const fileId = randomUUID();
+    const fileExtension = this.getFileExtension(file.originalname);
+    // Use custom path but append extension if not present, or just use as is?
+    // The requirement is [tenant-id]_[front/back]-ID.
+    // It's better to append the extension to ensure valid file type.
+    const fileName = `${customPath}${fileExtension}`;
+    const bucketname = this.configService.getOrThrow('minio.bucketName', {
+      infer: true,
+    });
+
+    try {
+      // Upload to MinIO
+      await this.minioService.putObject(
+        bucketname,
+        fileName,
+        file.buffer,
+        file.size,
+        {
+          'Content-Type': file.mimetype,
+        },
+      );
+
+      // Save file metadata to database
+      const fileData: Partial<FileEntity> = {
+        id: fileId,
+        path: fileName,
+        mimeType: file.mimetype,
+        size: file.size,
+        originalName: file.originalname,
+        owner: ownerId ? ({ id: ownerId } as any) : undefined,
+      };
+
+      const savedFile = await this.fileRepository.create(fileData);
+
+      return {
+        id: savedFile.id,
+        path: savedFile.path,
+        mimeType: savedFile.mimeType,
+        size: savedFile.size,
+        originalName: savedFile.originalName,
+        uploadedAt: savedFile.createdAt,
+      };
+    } catch (error) {
+      throw new BadRequestException(`Failed to upload file: ${error.message}`);
+    }
+  }
+
+  async createFolder(path: string) {
+    const bucketname = this.configService.getOrThrow('minio.bucketName', {
+      infer: true,
+    });
+    const folderPath = path.endsWith('/') ? path : `${path}/`;
+
+    try {
+      await this.minioService.putObject(
+        bucketname,
+        folderPath,
+        Buffer.from(''),
+        0,
+      );
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to create folder: ${error.message}`,
+      );
+    }
+  }
+
   async uploadBuffer(
     buffer: Buffer,
     filename: string,

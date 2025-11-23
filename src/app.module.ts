@@ -10,6 +10,7 @@ import appConfig from './config/app.config';
 import { ContractsModule } from './contracts/contracts.module';
 import { AllConfigType } from './config/config.type';
 import { BillingModule } from './billing/billing.module';
+import { VisionModule } from './vision/vision.module';
 import databaseConfig from './database/config/database.config';
 import { TypeOrmConfigService } from './database/typeorm-config.service';
 import { FilesModule } from './files/files.module';
@@ -95,6 +96,7 @@ import { RedisModule } from './redis/redis.module';
     RoomExpensesModule,
     BillingModule,
     ContractsModule,
+    VisionModule,
   ],
   controllers: [HealthController],
   providers: [],

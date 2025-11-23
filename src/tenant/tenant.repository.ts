@@ -69,4 +69,8 @@ export class TenantRepository {
   async remove(id: string): Promise<void> {
     await this.tenantRepository.softDelete(id);
   }
+
+  async save(tenant: TenantEntity): Promise<TenantEntity> {
+    return await this.tenantRepository.save(tenant);
+  }
 }

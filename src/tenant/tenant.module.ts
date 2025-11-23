@@ -8,12 +8,17 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TenantEntity } from './tenant.entity';
 import { TenantRepository } from './tenant.repository';
 
+import { VisionModule } from 'src/vision/vision.module';
+import { FilesModule } from 'src/files/files.module';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([TenantEntity]),
     HousesModule,
     RoomModule,
     UsersModule,
+    VisionModule,
+    FilesModule,
   ],
   controllers: [TenantController],
   providers: [TenantService, TenantRepository],

@@ -56,6 +56,86 @@ export class TenantEntity extends EntityRelationalHelper {
   address?: string;
 
   @ApiProperty({
+    type: String,
+    nullable: true,
+    required: false,
+  })
+  @Column({ type: String, nullable: true })
+  citizenId?: string;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    required: false,
+  })
+  @Column({ type: String, nullable: true })
+  sex?: string;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    required: false,
+  })
+  @Column({ type: String, nullable: true })
+  nationality?: string;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    required: false,
+  })
+  @Column({ type: String, nullable: true })
+  home?: string;
+
+  @ApiProperty({
+    type: Date,
+    nullable: true,
+    required: false,
+  })
+  @Column({ type: Date, nullable: true })
+  issueDate?: Date;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    required: false,
+  })
+  @Column({ type: String, nullable: true })
+  issueLoc?: string;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    required: false,
+  })
+  @Column({ type: String, nullable: true })
+  frontIdCardImagePath?: string;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    required: false,
+  })
+  @Column({ type: String, nullable: true })
+  backIdCardImagePath?: string;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    required: false,
+  })
+  @Column({ type: String, nullable: true })
+  tenantJob?: string;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    required: false,
+  })
+  @Column({ type: String, nullable: true })
+  tenantWorkAt?: string;
+
+  @ApiProperty({
     type: () => StatusEntity,
   })
   @ManyToOne(() => StatusEntity, {

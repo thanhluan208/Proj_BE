@@ -16,6 +16,8 @@ import {
 } from 'src/utils/dto/paginated-response.dto';
 import { TenantRepository } from './tenant.repository';
 import { TenantEntity } from './tenant.entity';
+import { VisionService } from 'src/vision/vision.service';
+import { FilesService } from 'src/files/files.service';
 
 @Injectable()
 export class TenantService {
@@ -26,7 +28,122 @@ export class TenantService {
     private roomsService: RoomsService,
     private usersService: UserService,
     private tenantRepository: TenantRepository,
+    private visionService: VisionService,
+    private filesService: FilesService,
   ) {}
+
+  async uploadIdCard(
+    tenantId: string,
+    files: {
+      frontImage?: Express.Multer.File[];
+      backImage?: Express.Multer.File[];
+    },
+  ) {
+    const tenant = await this.tenantRepository.findById(tenantId);
+    if (!tenant) {
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: {
+          tenant: 'tenantNotFound',
+        },
+      });
+    }
+
+    // Ensure room and house are loaded for path construction
+    // If tenant.room or tenant.room.house is missing, we might need to fetch them.
+    // Assuming findById loads relations or we fetch them here.
+    // Based on repository, findById might not load deep relations.
+    // Let's fetch the room and house to be sure.
+    const room = await this.roomsService.findById(tenant.room.id, tenant.room.house.owner.id); // This might be tricky if we don't have owner ID easily.
+    // Actually, let's just use the IDs we have if they are available in the tenant object.
+    // If tenant.room is just an ID, we need to fetch.
+    // Let's assume for now we can construct the path from what we have or fetch if needed.
+    // To be safe and correct, let's fetch the full tenant with relations if needed, or just rely on the IDs if they are present.
+    // The tenant entity definition shows ManyToOne, so they should be there if eager or joined.
+    // TenantRepository.findById uses findOne, which usually doesn't load relations unless specified.
+    // Let's check TenantRepository.findById again.
+    // It just does findOne({ where: { id } }).
+    // We should probably update findById to load relations or use a query builder here.
+    // For now, let's assume we need to fetch the room and house.
+    
+    // Wait, I can just use the IDs if I trust the structure.
+    // But to be safe, I'll use the IDs from the tenant object if they exist.
+    // If not, I might need to fetch.
+    // Let's assume tenant.room and tenant.room.house are loaded.
+    // If not, I'll need to fix TenantRepository.findById or do a separate fetch.
+    
+    // Actually, looking at TenantRepository.findById:
+    // return await this.tenantRepository.findOne({ where: { id } });
+    // This will NOT load relations by default unless eager: true is set in Entity.
+    // Let's check TenantEntity.
+    
+    // TenantEntity:
+    // @ManyToOne(() => RoomEntity, { eager: true })
+    // room: RoomEntity;
+    
+    // RoomEntity:
+    // @ManyToOne(() => HouseEntity, { eager: true })
+    // house: HouseEntity;
+    
+    // So relations ARE loaded eagerly! Great.
+    
+    const houseId = tenant.room.house.id;
+    const roomId = tenant.room.id;
+
+    const frontImage = files.frontImage?.[0];
+    const backImage = files.backImage?.[0];
+
+    if (frontImage) {
+      // 1. Extract info from front image
+      const frontInfo = await this.visionService.recognizeId(frontImage);
+      const data = frontInfo.data[0];
+
+      // 2. Update tenant info
+      tenant.citizenId = data.id !== 'N/A' ? data.id : tenant.citizenId;
+      tenant.name = data.name !== 'N/A' ? data.name : tenant.name;
+      tenant.dob =
+        data.dob !== 'N/A'
+          ? new Date(data.dob.split('/').reverse().join('-'))
+          : tenant.dob;
+      tenant.sex = data.sex !== 'N/A' ? data.sex : tenant.sex;
+      tenant.nationality =
+        data.nationality !== 'N/A' ? data.nationality : tenant.nationality;
+      tenant.home = data.home !== 'N/A' ? data.home : tenant.home;
+      tenant.address = data.address !== 'N/A' ? data.address : tenant.address;
+
+      // 3. Upload image
+      const path = `${houseId}/${roomId}/${tenant.id}/${tenant.id}_front-ID`;
+      const uploadedFile = await this.filesService.uploadFileWithCustomPath(
+        frontImage,
+        path,
+      );
+      tenant.frontIdCardImagePath = uploadedFile.path;
+    }
+
+    if (backImage) {
+      // 1. Extract info from back image
+      const backInfo = await this.visionService.recognizeIdBack(backImage);
+      const data = backInfo.data[0];
+
+      // 2. Update tenant info
+      tenant.issueDate =
+        data.issueDate !== 'N/A'
+          ? new Date(data.issueDate.split('/').reverse().join('-'))
+          : tenant.issueDate;
+      tenant.issueLoc =
+        data.issueLoc !== 'N/A' ? data.issueLoc : tenant.issueLoc;
+
+      // 3. Upload image
+      const path = `${houseId}/${roomId}/${tenant.id}/${tenant.id}_back-ID`;
+      const uploadedFile = await this.filesService.uploadFileWithCustomPath(
+        backImage,
+        path,
+      );
+      tenant.backIdCardImagePath = uploadedFile.path;
+    }
+
+    return this.tenantRepository.save(tenant);
+  }
 
   async create(
     createTenantDto: CreateTenantDto,
@@ -125,6 +242,11 @@ export class TenantService {
       dob: createTenantDto.dob ? new Date(createTenantDto.dob) : undefined,
       address: createTenantDto.address,
     });
+
+    // Create folder for tenant
+    await this.filesService.createFolder(
+      `${house.id}/${room.id}/${tenant.id}`,
+    );
 
     this.logger.log(`Tenant created successfully with ID: ${tenant.id}`);
     return tenant;

@@ -20,6 +20,8 @@ import { GetRoomsDto } from './dto/get-rooms.dto';
 import { RoomEntity } from './room.entity';
 import { RoomRepository } from './room.repository';
 
+import { FilesService } from 'src/files/files.service';
+
 @Injectable()
 export class RoomsService {
   private readonly logger = new Logger(RoomsService.name);
@@ -31,6 +33,7 @@ export class RoomsService {
     private userService: UserService,
     private houseService: HousesService,
     private roomsRepository: RoomRepository,
+    private filesService: FilesService,
   ) {}
 
   async create(createRoomDto: CreateRoomDto, userJwtPayload: JwtPayloadType) {
@@ -103,6 +106,9 @@ export class RoomsService {
       ...createRoomDto,
       house: house,
     });
+
+    // Create folder for room
+    await this.filesService.createFolder(`${house.id}/${room.id}`);
 
     await this.redisService.incr(
       `${this.CACHE_ROOM_VERSION_KEY}:${currentUser.id}:${house.id}`,

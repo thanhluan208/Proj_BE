@@ -22,6 +22,10 @@ async function bootstrap() {
   // Enable CORS if needed
   app.enableCors('*');
 
+  // Set global API prefix
+  const apiPrefix = configService.get('app.apiPrefix', { infer: true });
+  app.setGlobalPrefix(apiPrefix);
+
   // Swagger Configuration
   const config = new DocumentBuilder()
     .setTitle('Project Management API')

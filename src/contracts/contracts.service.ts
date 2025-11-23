@@ -227,11 +227,8 @@ export class ContractsService {
         linebreaks: true,
       });
 
-      // Set the template variables
-      doc.setData(contractData);
-
-      // Render the document
-      doc.render();
+      // Render the document with template variables
+      doc.render(contractData);
 
       // Generate the document buffer
       const buffer = doc.getZip().generate({

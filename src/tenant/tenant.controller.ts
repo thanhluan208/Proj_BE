@@ -4,10 +4,13 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   Query,
   Request,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiCreatedResponse, ApiTags } from '@nestjs/swagger';
@@ -19,6 +22,7 @@ import { CreateTenantDto } from './dto/create-tenant.dto';
 import { GetTenantDto } from './dto/get-tenant.dto';
 import { TenantService } from './tenant.service';
 import { TenantEntity } from './tenant.entity';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 
 @ApiBearerAuth()
 @ApiTags('tenant')
@@ -61,5 +65,27 @@ export class TenantController {
     @Query() query: GetTenantDto,
   ): Promise<PaginationInfoResponseDto> {
     return this.tenantService.countByRoom(request.user.id, query);
+  }
+
+  @ApiCreatedResponse({
+    type: TenantEntity,
+  })
+  @Post(':id/upload-id-card')
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'frontImage', maxCount: 1 },
+      { name: 'backImage', maxCount: 1 },
+    ]),
+  )
+  @HttpCode(HttpStatus.OK)
+  uploadIdCard(
+    @Param('id') id: string,
+    @UploadedFiles()
+    files: {
+      frontImage?: Express.Multer.File[];
+      backImage?: Express.Multer.File[];
+    },
+  ): Promise<TenantEntity> {
+    return this.tenantService.uploadIdCard(id, files);
   }
 }

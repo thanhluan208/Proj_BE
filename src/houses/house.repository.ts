@@ -73,6 +73,7 @@ export class HouseRepository {
         id,
         owner: { id: owner_id },
       },
+      relations: ['owner'],
     });
   }
 

@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:17.4-alpine
+    restart: always
     ports:
       - ${DATABASE_PORT}:5432
     volumes:
@@ -9,35 +10,38 @@ services:
       POSTGRES_USER: ${DATABASE_USERNAME}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
       POSTGRES_DB: ${DATABASE_NAME}
-
-  # maildev:
-  #   build:
-  #     context: .
-  #     dockerfile: maildev.Dockerfile
-  #   ports:
-  #     - ${MAIL_CLIENT_PORT}:1080
-  #     - ${MAIL_PORT}:1025
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME} -d ${DATABASE_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   adminer:
     image: adminer
     restart: always
     ports:
-      - 8080:8080
+      - ${ADMINER_PORT:-8080}:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   minio:
-    image: bitnami/minio:2024.11.7
+    image: minio/minio:latest
     restart: always
     ports:
-      - ${MINIO_PORT}:${MINIO_PORT}
-      - ${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_PORT}
+      - ${MINIO_PORT}:9000
+      - ${MINIO_CONSOLE_PORT}:9001
     environment:
       MINIO_ROOT_USER: ${MINIO_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
-      MINIO_DEFAULT_BUCKETS: ${MINIO_BUCKET}
-      MINIO_API_PORT_NUMBER: ${MINIO_PORT}
-      MINIO_CONSOLE_PORT_NUMBER: ${MINIO_CONSOLE_PORT}
     volumes:
-      - minio-data:/bitnami/minio/data    
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -47,18 +51,47 @@ services:
     volumes:
       - redis-data:/data
     command: 
-      redis-server
-      --appendonly yes
-      --requirepass ${REDIS_PASSWORD}
-    environment:
-      - REDIS_REPLICATION_MODE=master
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   api:
     build:
       context: .
       dockerfile: Dockerfile
+    restart: always
     ports:
       - ${APP_PORT}:${APP_PORT}
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - APP_PORT=${APP_PORT}
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USERNAME=${DATABASE_USERNAME}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - DATABASE_NAME=${DATABASE_NAME}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=${MINIO_PORT}
+      - MINIO_USER=${MINIO_USER}
+      - MINIO_PASSWORD=${MINIO_PASSWORD}
+      - MINIO_BUCKET=${MINIO_BUCKET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
 
 volumes:
   boilerplate-db:

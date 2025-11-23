@@ -19,6 +19,8 @@ import { CreateHouseDto } from './dto/create-house.dto';
 import { HouseEntity } from './house.entity';
 import { HouseRepository } from './house.repository';
 
+import { FilesService } from 'src/files/files.service';
+
 @Injectable()
 export class HousesService {
   private readonly logger = new Logger(HousesService.name);
@@ -29,6 +31,7 @@ export class HousesService {
     private readonly redisService: RedisService,
     private userService: UserService,
     private houseRepository: HouseRepository,
+    private filesService: FilesService,
   ) {}
 
   async create(createHouseDto: CreateHouseDto, userJwtPayload: JwtPayloadType) {
@@ -42,6 +45,9 @@ export class HousesService {
       owner: currentUser,
       status,
     });
+
+    // Create folder for house
+    await this.filesService.createFolder(house.id);
 
     const houseCacheVersion = await this.redisService.get(
       `${this.CACHE_HOUSE_VERSION_KEY}:${currentUser.id}`,
