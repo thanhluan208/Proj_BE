@@ -90,16 +90,16 @@ export class RoomsService {
       throw new BadRequestException('base_rent must be greater than 0');
     }
 
-    if (living_fee !== undefined && Number(living_fee) <= 0) {
-      throw new BadRequestException('living_fee must be greater than 0');
+    if (living_fee !== undefined && Number(living_fee) < 0) {
+      throw new BadRequestException('living_fee must be positive number');
     }
 
-    if (parking_fee !== undefined && Number(parking_fee) <= 0) {
-      throw new BadRequestException('parking_fee must be greater than 0');
+    if (parking_fee !== undefined && Number(parking_fee) < 0) {
+      throw new BadRequestException('parking_fee must be positive number');
     }
 
-    if (cleaning_fee !== undefined && Number(cleaning_fee) <= 0) {
-      throw new BadRequestException('cleaning_fee must be greater than 0');
+    if (cleaning_fee !== undefined && Number(cleaning_fee) < 0) {
+      throw new BadRequestException('cleaning_fee must be positive number');
     }
 
     const room = await this.roomsRepository.create({
