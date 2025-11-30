@@ -244,6 +244,17 @@ export class TenantService {
       name: createTenantDto.name,
       dob: createTenantDto.dob ? new Date(createTenantDto.dob) : undefined,
       address: createTenantDto.address,
+      phoneNumber: createTenantDto.phoneNumber,
+      citizenId: createTenantDto.citizenId,
+      sex: createTenantDto.sex,
+      nationality: createTenantDto.nationality,
+      home: createTenantDto.home,
+      issueDate: createTenantDto.issueDate
+        ? new Date(createTenantDto.issueDate)
+        : undefined,
+      issueLoc: createTenantDto.issueLoc,
+      tenantJob: createTenantDto.tenantJob,
+      tenantWorkAt: createTenantDto.tenantWorkAt,
     });
 
     // Create folder for tenant
@@ -285,6 +296,10 @@ export class TenantService {
     const tenants = await this.tenantRepository.findByRoom(room.id, {
       skip,
       take: pageSize,
+      status: payload.status,
+      dateFrom: payload.dateFrom,
+      dateTo: payload.dateTo,
+      search: payload.search,
     });
     return {
       data: tenants,
@@ -318,7 +333,12 @@ export class TenantService {
       });
     }
     // 3. Count tenants
-    const total = await this.tenantRepository.countByRoom(room.id);
+    const total = await this.tenantRepository.countByRoom(room.id, {
+      status: payload.status,
+      dateFrom: payload.dateFrom,
+      dateTo: payload.dateTo,
+      search: payload.search,
+    });
     return { total };
   }
 

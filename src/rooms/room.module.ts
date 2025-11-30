@@ -6,6 +6,9 @@ import { RoomEntity } from './room.entity';
 import { RoomRepository } from './room.repository';
 import { HousesModule } from 'src/houses/house.module';
 import { UsersModule } from 'src/users/users.module';
+import { TenantEntity } from 'src/tenant/tenant.entity';
+import { BillingEntity } from 'src/billing/billing.entity';
+import { RoomExpenseEntity } from 'src/room-expenses/room-expense.entity';
 
 import { FilesModule } from 'src/files/files.module';
 
@@ -13,7 +16,12 @@ import { FilesModule } from 'src/files/files.module';
   imports: [
     HousesModule,
     UsersModule,
-    TypeOrmModule.forFeature([RoomEntity]),
+    TypeOrmModule.forFeature([
+      RoomEntity,
+      TenantEntity,
+      BillingEntity,
+      RoomExpenseEntity,
+    ]),
     FilesModule,
   ],
   controllers: [RoomsController],

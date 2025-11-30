@@ -27,6 +27,7 @@ import {
   PaginationInfoResponseDto,
 } from 'src/utils/dto/paginated-response.dto';
 import { GetRoomsDto } from './dto/get-rooms.dto';
+import { RoomDetailResponseDto } from './dto/room-detail-response.dto';
 
 @ApiBearerAuth()
 @ApiTags('rooms')
@@ -56,6 +57,19 @@ export class RoomsController {
     @Body() body: UpdateRoomDto,
   ): Promise<RoomEntity | null> {
     return this.roomsService.update(id, body, request.user.id);
+  }
+
+  @ApiCreatedResponse({
+    type: RoomDetailResponseDto,
+  })
+  @Get(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiParam({ name: 'id', type: String, description: 'Room ID' })
+  findOne(
+    @Param('id') id: string,
+    @Request() request,
+  ): Promise<RoomDetailResponseDto> {
+    return this.roomsService.getRoomDetail(id, request.user.id);
   }
 
   @ApiCreatedResponse({

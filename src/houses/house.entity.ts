@@ -31,7 +31,6 @@ export class HouseEntity extends EntityRelationalHelper {
   @ManyToOne(() => UserEntity, {
     eager: true,
   })
-  @Expose({ groups: ['admin'] })
   owner: UserEntity;
 
   @ApiProperty({

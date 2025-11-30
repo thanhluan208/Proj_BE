@@ -23,6 +23,12 @@ import { StatusEnum } from 'src/statuses/statuses.enum';
 import { StatusEntity } from 'src/statuses/status.entity';
 
 import { FilesService } from 'src/files/files.service';
+import { RoomDetailResponseDto } from './dto/room-detail-response.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { TenantEntity } from 'src/tenant/tenant.entity';
+import { IsNull, Repository } from 'typeorm';
+import { BillingEntity } from 'src/billing/billing.entity';
+import { RoomExpenseEntity } from 'src/room-expenses/room-expense.entity';
 
 @Injectable()
 export class RoomsService {
@@ -36,6 +42,12 @@ export class RoomsService {
     private houseService: HousesService,
     private roomsRepository: RoomRepository,
     private filesService: FilesService,
+    @InjectRepository(TenantEntity)
+    private readonly tenantRepository: Repository<TenantEntity>,
+    @InjectRepository(BillingEntity)
+    private readonly billingRepository: Repository<BillingEntity>,
+    @InjectRepository(RoomExpenseEntity)
+    private readonly roomExpenseRepository: Repository<RoomExpenseEntity>,
   ) {}
 
   async create(createRoomDto: CreateRoomDto, userJwtPayload: JwtPayloadType) {
@@ -202,6 +214,39 @@ export class RoomsService {
     return room as RoomEntity;
   }
 
+  async getRoomDetail(
+    id: string,
+    userId: string,
+  ): Promise<RoomDetailResponseDto> {
+    const room = await this.findById(id, userId);
+
+    const totalTenants = await this.tenantRepository.count({
+      where: {
+        room: { id: room.id },
+        deletedAt: IsNull(),
+      },
+    });
+
+    const totalIncomeResult = await this.billingRepository
+      .createQueryBuilder('billing')
+      .select('SUM(billing.total_amount)', 'sum')
+      .where('billing.roomId = :roomId', { roomId: room.id })
+      .getRawOne();
+
+    const totalExpensesResult = await this.roomExpenseRepository
+      .createQueryBuilder('expense')
+      .select('SUM(expense.amount)', 'sum')
+      .where('expense.roomId = :roomId', { roomId: room.id })
+      .getRawOne();
+
+    return {
+      ...room,
+      totalTenants,
+      totalIncome: Number(totalIncomeResult?.sum || 0),
+      totalExpenses: Number(totalExpensesResult?.sum || 0),
+    } as RoomDetailResponseDto;
+  }
+
   async findByHouse(
     userId: string,
     payload: GetRoomsDto,
@@ -241,7 +286,7 @@ export class RoomsService {
         skip,
         take: pageSize,
       });
-      console.log('Rooms:', rooms)
+      console.log('Rooms:', rooms);
       if (rooms.length > 0 && rooms?.length === pageSize) {
         await this.redisService.set(
           cacheKey,

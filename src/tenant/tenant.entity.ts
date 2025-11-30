@@ -26,9 +26,7 @@ export class TenantEntity extends EntityRelationalHelper {
   @ApiProperty({
     type: () => RoomEntity,
   })
-  @ManyToOne(() => RoomEntity, {
-    eager: true,
-  })
+  @ManyToOne(() => RoomEntity)
   room: RoomEntity;
 
   @ApiProperty({
@@ -38,6 +36,15 @@ export class TenantEntity extends EntityRelationalHelper {
   @Index()
   @Column({ type: String })
   name: string;
+
+  @ApiProperty({
+    type: String,
+    example: '0909090909',
+    nullable: true,
+    required: false,
+  })
+  @Column({ type: String, nullable: true })
+  phoneNumber?: string;
 
   @ApiProperty({
     type: Date,
