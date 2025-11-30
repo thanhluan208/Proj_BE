@@ -19,6 +19,7 @@ export class RoomRepository {
   async findById(id: string): Promise<RoomEntity | null> {
     return await this.roomRepository.findOne({
       where: { id },
+      relations: ['house'],
     });
   }
 
@@ -28,6 +29,7 @@ export class RoomRepository {
   ): Promise<RoomEntity | null> {
     return await this.roomRepository.findOne({
       where: { id, house: { owner: { id: owner_id } } },
+      relations: ['house'],
     });
   }
 

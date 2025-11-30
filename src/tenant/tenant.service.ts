@@ -54,7 +54,10 @@ export class TenantService {
     // Assuming findById loads relations or we fetch them here.
     // Based on repository, findById might not load deep relations.
     // Let's fetch the room and house to be sure.
-    const room = await this.roomsService.findById(tenant.room.id, tenant.room.house.owner.id); // This might be tricky if we don't have owner ID easily.
+    const room = await this.roomsService.findById(
+      tenant.room.id,
+      tenant.room.house.owner.id,
+    ); // This might be tricky if we don't have owner ID easily.
     // Actually, let's just use the IDs we have if they are available in the tenant object.
     // If tenant.room is just an ID, we need to fetch.
     // Let's assume for now we can construct the path from what we have or fetch if needed.
@@ -65,28 +68,28 @@ export class TenantService {
     // It just does findOne({ where: { id } }).
     // We should probably update findById to load relations or use a query builder here.
     // For now, let's assume we need to fetch the room and house.
-    
+
     // Wait, I can just use the IDs if I trust the structure.
     // But to be safe, I'll use the IDs from the tenant object if they exist.
     // If not, I might need to fetch.
     // Let's assume tenant.room and tenant.room.house are loaded.
     // If not, I'll need to fix TenantRepository.findById or do a separate fetch.
-    
+
     // Actually, looking at TenantRepository.findById:
     // return await this.tenantRepository.findOne({ where: { id } });
     // This will NOT load relations by default unless eager: true is set in Entity.
     // Let's check TenantEntity.
-    
+
     // TenantEntity:
     // @ManyToOne(() => RoomEntity, { eager: true })
     // room: RoomEntity;
-    
+
     // RoomEntity:
     // @ManyToOne(() => HouseEntity, { eager: true })
     // house: HouseEntity;
-    
+
     // So relations ARE loaded eagerly! Great.
-    
+
     const houseId = tenant.room.house.id;
     const roomId = tenant.room.id;
 
@@ -244,9 +247,7 @@ export class TenantService {
     });
 
     // Create folder for tenant
-    await this.filesService.createFolder(
-      `${house.id}/${room.id}/${tenant.id}`,
-    );
+    await this.filesService.createFolder(`${house.id}/${room.id}/${tenant.id}`);
 
     this.logger.log(`Tenant created successfully with ID: ${tenant.id}`);
     return tenant;

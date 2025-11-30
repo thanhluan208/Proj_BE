@@ -19,6 +19,8 @@ import { UpdateRoomDto } from './dto/update-room.dto';
 import { GetRoomsDto } from './dto/get-rooms.dto';
 import { RoomEntity } from './room.entity';
 import { RoomRepository } from './room.repository';
+import { StatusEnum } from 'src/statuses/statuses.enum';
+import { StatusEntity } from 'src/statuses/status.entity';
 
 import { FilesService } from 'src/files/files.service';
 
@@ -105,6 +107,9 @@ export class RoomsService {
     const room = await this.roomsRepository.create({
       ...createRoomDto,
       house: house,
+      status: {
+        id: StatusEnum.active,
+      } as StatusEntity,
     });
 
     // Create folder for room
@@ -236,6 +241,7 @@ export class RoomsService {
         skip,
         take: pageSize,
       });
+      console.log('Rooms:', rooms)
       if (rooms.length > 0 && rooms?.length === pageSize) {
         await this.redisService.set(
           cacheKey,

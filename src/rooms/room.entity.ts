@@ -28,9 +28,7 @@ export class RoomEntity extends EntityRelationalHelper {
   @ApiProperty({
     type: () => HouseEntity,
   })
-  @ManyToOne(() => HouseEntity, {
-    eager: true,
-  })
+  @ManyToOne(() => HouseEntity)
   house: HouseEntity;
 
   @ApiProperty({
@@ -55,7 +53,6 @@ export class RoomEntity extends EntityRelationalHelper {
   @ManyToOne(() => StatusEntity, {
     eager: true,
   })
-  @Expose({ groups: ['admin'] })
   status?: StatusEntity;
 
   @ApiProperty({
@@ -122,6 +119,14 @@ export class RoomEntity extends EntityRelationalHelper {
   })
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   cleaning_fee: number;
+
+  @ApiProperty({
+    type: Date,
+    example: '2024-01-01',
+    nullable: true,
+  })
+  @Column({ type: 'date', nullable: true })
+  paymentDate?: Date;
 
   @ApiProperty()
   @CreateDateColumn()
