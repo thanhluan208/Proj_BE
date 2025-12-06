@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   Request,
@@ -19,6 +21,7 @@ import {
   PaginationInfoResponseDto,
 } from 'src/utils/dto/paginated-response.dto';
 import { CreateTenantDto } from './dto/create-tenant.dto';
+import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { GetTenantDto } from './dto/get-tenant.dto';
 import { TenantService } from './tenant.service';
 import { TenantEntity } from './tenant.entity';
@@ -70,6 +73,19 @@ export class TenantController {
   @ApiCreatedResponse({
     type: TenantEntity,
   })
+  @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  update(
+    @Request() request,
+    @Param('id') id: string,
+    @Body() body: UpdateTenantDto,
+  ): Promise<TenantEntity> {
+    return this.tenantService.update(id, body, request.user);
+  }
+
+  @ApiCreatedResponse({
+    type: TenantEntity,
+  })
   @Post(':id/upload-id-card')
   @UseInterceptors(
     FileFieldsInterceptor([
@@ -87,5 +103,29 @@ export class TenantController {
     },
   ): Promise<TenantEntity> {
     return this.tenantService.uploadIdCard(id, files);
+  }
+
+  @ApiCreatedResponse({
+    type: TenantEntity,
+  })
+  @Post(':id/toggle-status')
+  @HttpCode(HttpStatus.OK)
+  toggleStatus(
+    @Request() request,
+    @Param('id') id: string,
+  ): Promise<TenantEntity> {
+    return this.tenantService.toggleStatus(id, request.user);
+  }
+
+  @ApiCreatedResponse({
+    type: Object,
+  })
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  delete(
+    @Request() request,
+    @Param('id') id: string,
+  ): Promise<{ success: boolean; message: string }> {
+    return this.tenantService.delete(id, request.user);
   }
 }

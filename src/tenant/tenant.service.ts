@@ -8,6 +8,7 @@ import { HousesService } from 'src/houses/houses.service';
 import { RoomsService } from 'src/rooms/rooms.service';
 import { UserService } from 'src/users/users.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
+import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { JwtPayloadType } from 'src/auth/strategies/types/jwt-payload.type';
 import { GetTenantDto } from './dto/get-tenant.dto';
 import {
@@ -18,6 +19,9 @@ import { TenantRepository } from './tenant.repository';
 import { TenantEntity } from './tenant.entity';
 import { VisionService } from 'src/vision/vision.service';
 import { FilesService } from 'src/files/files.service';
+import { StatusEnum } from 'src/statuses/statuses.enum';
+import { StatusEntity } from 'src/statuses/status.entity';
+import { TenantHelper } from './tenant.helper';
 
 @Injectable()
 export class TenantService {
@@ -255,6 +259,9 @@ export class TenantService {
       issueLoc: createTenantDto.issueLoc,
       tenantJob: createTenantDto.tenantJob,
       tenantWorkAt: createTenantDto.tenantWorkAt,
+      status: {
+        id: StatusEnum.active,
+      } as StatusEntity,
     });
 
     // Create folder for tenant
@@ -354,5 +361,118 @@ export class TenantService {
 
     this.logger.log(`Found tenant with ID: ${id}`);
     return tenant;
+  }
+
+  async update(
+    tenantId: string,
+    updateTenantDto: UpdateTenantDto,
+    userJwtPayload: JwtPayloadType,
+  ) {
+    this.logger.log(`Updating tenant with ID: ${tenantId}`);
+
+    // Validate user and tenant ownership
+    const { tenant } = await TenantHelper.validateUserAndTenantOwnership(
+      this.usersService,
+      this.tenantRepository,
+      userJwtPayload,
+      tenantId,
+    );
+
+    // Update tenant fields
+    if (updateTenantDto.name !== undefined) {
+      tenant.name = updateTenantDto.name;
+    }
+    if (updateTenantDto.dob !== undefined) {
+      tenant.dob = updateTenantDto.dob
+        ? new Date(updateTenantDto.dob)
+        : undefined;
+    }
+    if (updateTenantDto.address !== undefined) {
+      tenant.address = updateTenantDto.address;
+    }
+    if (updateTenantDto.phoneNumber !== undefined) {
+      tenant.phoneNumber = updateTenantDto.phoneNumber;
+    }
+    if (updateTenantDto.citizenId !== undefined) {
+      tenant.citizenId = updateTenantDto.citizenId;
+    }
+    if (updateTenantDto.sex !== undefined) {
+      tenant.sex = updateTenantDto.sex;
+    }
+    if (updateTenantDto.nationality !== undefined) {
+      tenant.nationality = updateTenantDto.nationality;
+    }
+    if (updateTenantDto.home !== undefined) {
+      tenant.home = updateTenantDto.home;
+    }
+    if (updateTenantDto.issueDate !== undefined) {
+      tenant.issueDate = updateTenantDto.issueDate
+        ? new Date(updateTenantDto.issueDate)
+        : undefined;
+    }
+    if (updateTenantDto.issueLoc !== undefined) {
+      tenant.issueLoc = updateTenantDto.issueLoc;
+    }
+    if (updateTenantDto.tenantJob !== undefined) {
+      tenant.tenantJob = updateTenantDto.tenantJob;
+    }
+    if (updateTenantDto.tenantWorkAt !== undefined) {
+      tenant.tenantWorkAt = updateTenantDto.tenantWorkAt;
+    }
+
+    const updatedTenant = await this.tenantRepository.save(tenant);
+    this.logger.log(`Tenant ${tenantId} updated successfully`);
+
+    return updatedTenant;
+  }
+
+  async toggleStatus(tenantId: string, userJwtPayload: JwtPayloadType) {
+    this.logger.log(`Toggling tenant ${tenantId} status`);
+
+    // Validate user and tenant ownership (include status relation)
+    const { tenant } = await TenantHelper.validateUserAndTenantOwnership(
+      this.usersService,
+      this.tenantRepository,
+      userJwtPayload,
+      tenantId,
+      true, // include status
+    );
+
+    // Determine new status by toggling current status
+    const currentStatus = tenant.status?.id || StatusEnum.inactive;
+    const newStatus =
+      currentStatus === StatusEnum.active
+        ? StatusEnum.inactive
+        : StatusEnum.active;
+
+    // Update tenant status
+    tenant.status = {
+      id: newStatus,
+    } as StatusEntity;
+
+    const updatedTenant = await this.tenantRepository.save(tenant);
+    this.logger.log(
+      `Tenant ${tenantId} status toggled from ${currentStatus === StatusEnum.active ? 'active' : 'inactive'} to ${newStatus === StatusEnum.active ? 'active' : 'inactive'}`,
+    );
+
+    return updatedTenant;
+  }
+
+  async delete(tenantId: string, userJwtPayload: JwtPayloadType) {
+    this.logger.log(`Soft deleting tenant with ID: ${tenantId}`);
+
+    // Validate user and tenant ownership
+    await TenantHelper.validateUserAndTenantOwnership(
+      this.usersService,
+      this.tenantRepository,
+      userJwtPayload,
+      tenantId,
+    );
+
+    // Soft delete the tenant
+    await this.tenantRepository.remove(tenantId);
+    this.logger.log(`Tenant ${tenantId} soft deleted successfully`);
+
+    return { success: true, message: 'Tenant deleted successfully' };
   }
 }

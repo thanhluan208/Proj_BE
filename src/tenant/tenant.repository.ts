@@ -15,9 +15,13 @@ export class TenantRepository {
     return await this.tenantRepository.save(newEntity);
   }
 
-  async findById(id: string): Promise<TenantEntity | null> {
+  async findById(
+    id: string,
+    relations?: string[],
+  ): Promise<TenantEntity | null> {
     return await this.tenantRepository.findOne({
       where: { id },
+      ...(relations && { relations }),
     });
   }
 
