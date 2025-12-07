@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { StatusEntity } from 'src/statuses/status.entity';
 import { HouseEntity } from 'src/houses/house.entity';
+import { StatusEntity } from 'src/statuses/status.entity';
 import { EntityRelationalHelper } from 'src/utils/relational-entity-helper';
 import {
   Column,
@@ -12,7 +12,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Expose } from 'class-transformer';
 
 @Entity({
   name: 'room',
@@ -70,6 +69,13 @@ export class RoomEntity extends EntityRelationalHelper {
   })
   @Column({ type: 'decimal', precision: 15, scale: 2 })
   base_rent: number;
+
+  @ApiProperty({
+    type: Number,
+    example: 100000,
+  })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  internet_fee: number;
 
   @ApiProperty({
     type: Number,

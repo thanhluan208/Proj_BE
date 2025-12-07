@@ -39,6 +39,22 @@ export class CreateUserDto {
   @Type(() => StatusDto)
   status?: StatusDto;
 
+  @ApiPropertyOptional({ example: '0909090909', type: String })
+  @IsOptional()
+  phoneNumber?: string;
+
+  @ApiPropertyOptional({ example: 'John Doe', type: String })
+  @IsOptional()
+  bankAccountName?: string;
+
+  @ApiPropertyOptional({ example: '0909090909', type: String })
+  @IsOptional()
+  bankAccountNumber?: string;
+
+  @ApiPropertyOptional({ example: 'VCB', type: String })
+  @IsOptional()
+  bankName?: string;
+
   @IsString()
   @Length(6, 150)
   @Matches(/^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/, {

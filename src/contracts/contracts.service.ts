@@ -3,23 +3,26 @@ import {
   HttpStatus,
   Injectable,
   Logger,
-  NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { ContractsRepository } from './contracts.repository';
-import { ContractEntity } from './contract.entity';
-import { CreateContractDto } from './dtos/create-contract.dto';
-import { JwtPayloadType } from 'src/auth/strategies/types/jwt-payload.type';
-import { TenantService } from 'src/tenant/tenant.service';
-import { RoomsService } from 'src/rooms/rooms.service';
-import { FilesService } from 'src/files/files.service';
-import { UserService } from 'src/users/users.service';
-import { numberToVietnameseText } from 'src/utils/helper';
 import dayjs from 'dayjs';
 import Docxtemplater from 'docxtemplater';
-import PizZip from 'pizzip';
 import * as fs from 'fs';
 import * as path from 'path';
+import PizZip from 'pizzip';
+import { JwtPayloadType } from 'src/auth/strategies/types/jwt-payload.type';
+import { FilesService } from 'src/files/files.service';
+import { RoomEntity } from 'src/rooms/room.entity';
+import { RoomsService } from 'src/rooms/rooms.service';
+import { TenantEntity } from 'src/tenant/tenant.entity';
+import { TenantService } from 'src/tenant/tenant.service';
+import { UserEntity } from 'src/users/user.entity';
+import { UserService } from 'src/users/users.service';
+import { numberToVietnameseText } from 'src/utils/helper';
+import { ContractsRepository } from './contracts.repository';
+import { CreateContractDto } from './dtos/create-contract.dto';
+
+import { cloneDeep } from 'lodash';
 
 @Injectable()
 export class ContractsService {
@@ -37,74 +40,38 @@ export class ContractsService {
     contractData: CreateContractDto,
     userJwtPayload: JwtPayloadType,
   ) {
-    const result = await this.generateAndSaveContract(
-      contractData.roomId,
-      contractData.tenantId,
-      userJwtPayload.id,
+    const { owner, room, tenants } = await this.validate(
+      contractData,
+      userJwtPayload,
     );
 
-    // Create contract entity and save to database
-    const contract = await this.contractsRepository.create({
-      owner: { id: userJwtPayload.id } as any,
-      tenant: { id: contractData.tenantId } as any,
-      room: { id: contractData.roomId } as any,
-      file: result.file,
-    });
+    await this.generateAndSaveContract(owner, room, tenants, contractData);
 
     return {
-      contract,
-      file: result.file,
       message: 'Contract created and saved successfully',
     };
   }
 
-  async generateContractData(
-    roomId: string,
-    tenantId: string,
-    ownerId: string,
+  generateContractData(
+    owner: UserEntity,
+    room: RoomEntity,
+    tenants: TenantEntity[],
+    contractPayload: CreateContractDto,
   ) {
-    const currentUser = await this.userService.findById(ownerId);
-    this.logger.log(
-      `Retrieved current user: ${currentUser?.id || 'not found'}`,
-    );
+    const { createdDate, houseInfo, bankInfo } = contractPayload;
+    const {
+      houseOwner,
+      houseAddress,
+      houseOwnerBackupPhoneNumber,
+      houseOwnerPhoneNumber,
+      overRentalFee,
+    } = houseInfo;
 
-    if (!currentUser) {
-      this.logger.error(`User not found with ID: ${ownerId}`);
-      throw new UnprocessableEntityException({
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-        errors: {
-          user: 'userNotFound',
-        },
-      });
-    }
+    const { bankAccountName, bankAccountNumber, bankName } = bankInfo;
 
-    // Validate tenant exists
-    const tenant = await this.tenantService.findById(tenantId);
-    this.logger.log(`Retrieved tenant: ${tenant?.id || 'not found'}`);
+    const { house } = room;
 
-    if (!tenant) {
-      this.logger.error(`Tenant not found with ID: ${tenantId}`);
-      throw new UnprocessableEntityException({
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-        errors: {
-          tenant: 'tenantNotFound',
-        },
-      });
-    }
-
-    // Validate room exists
-    const room = await this.roomService.findById(roomId, ownerId);
-    this.logger.log(`Retrieved room: ${room?.id || 'not found'}`);
-
-    if (!room) {
-      this.logger.error(`Room not found with ID: ${roomId}`);
-      throw new UnprocessableEntityException({
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-        errors: {
-          room: 'roomNotFound',
-        },
-      });
-    }
+    const firstTenant = tenants[0];
 
     // Calculate contract dates
     const startDate = new Date();
@@ -116,71 +83,77 @@ export class ContractsService {
     const roomDeposit = roomPrice; // Assuming deposit equals one month rent
     const roomFirstMonthTotal = roomPrice + roomDeposit;
 
-    // Build contract data
+    const tenantsData = cloneDeep(tenants).map((elm) => {
+      return {
+        name: firstTenant.name || 'N/A',
+        phone: firstTenant.phoneNumber || 'N/A',
+        citizenId: firstTenant.citizenId || 'N/A',
+        citizenIdCreatedAt: firstTenant.issueDate || 'N/A',
+        citizenIdCreatedBy: firstTenant.issueLoc || 'N/A',
+      };
+    });
+
+    const roomElectricFee = room.price_per_electricity_unit
+      ? `${Number(room.price_per_electricity_unit).toLocaleString('vi-VN')} đồng/kwh`
+      : `${Number(room.fixed_electricity_fee).toLocaleString('vi-VN')} đồng/người`;
+
+    const roomWaterFee = room.price_per_water_unit
+      ? `${Number(room.price_per_water_unit).toLocaleString('vi-VN')} đồng/m3`
+      : `${Number(room.fixed_water_fee).toLocaleString('vi-VN')} đồng/người`;
+
     const contractData = {
-      // Primary tenant info
-      tenantName: tenant.name,
-      tenantPhone: 'Chưa cập nhật', // Will be added to tenant entity later
-      tenantCitizenId: 'Chưa cập nhật',
-      tenantCitizenIdCreatedAt: 'Chưa cập nhật',
-      tenantCitizenIdCreatedBy: 'Chưa cập nhật',
-      tenantCitizenIdAddress: tenant.address || 'Chưa cập nhật',
-      tenantJob: 'Chưa cập nhật',
-      tenantWorkAt: 'Chưa cập nhật',
+      createdDay: dayjs(createdDate).format('DD'),
+      createdMonth: dayjs(createdDate).format('MM'),
+      createdYear: dayjs(createdDate).format('YYYY'),
+      houseOwner: houseOwner || `${owner.lastName} ${owner.firstName}`,
+      houseAddress: houseAddress || house.address,
+      houseOwnerPhoneNumber: houseOwnerPhoneNumber || owner.phoneNumber,
+      houseOwnerBackupPhoneNumber: houseOwnerBackupPhoneNumber,
+      bankAccountName: bankAccountName || owner.bankAccountName,
+      bankAccountNumber: bankAccountNumber || owner.bankAccountNumber,
+      bankName: bankName || owner.bankName,
 
-      // Additional tenants
-      tenantA: tenant.name || 'Không có',
-      tenantAPhone: 'Chưa cập nhật',
-      tenantACitizenId: 'Chưa cập nhật',
-      tenantACitizenIdCreatedAt: 'Chưa cập nhật',
-      tenantACitizenIdCreatedBy: 'Chưa cập nhật',
-      tenantACitizenIdAddress: tenant.address || 'Chưa cập nhật',
+      mainTenantName: firstTenant.name,
+      mainTenantPhone: firstTenant.phoneNumber,
+      mainTenantCitizenId: firstTenant.citizenId,
+      mainTenantCitizenIdCreatedAt: firstTenant.issueDate,
+      mainTenantCitizenIdCreatedBy: firstTenant.issueLoc,
+      mainTenantJob: firstTenant.tenantJob,
+      mainTenantWorkAt: firstTenant.tenantWorkAt,
 
-      tenantB: tenant.name || 'Không có',
-      tenantBPhone: 'Chưa cập nhật',
-      tenantBCitizenId: 'Chưa cập nhật',
-      tenantBCitizenIdCreatedAt: 'Chưa cập nhật',
-      tenantBCitizenIdCreatedBy: 'Chưa cập nhật',
-      tenantBCitizenIdAddress: tenant.address || 'Chưa cập nhật',
+      tenants: tenantsData,
 
-      // Room and pricing info
+      overRentalFee: overRentalFee || house.overRentalFee,
+
       roomPrice: roomPrice.toLocaleString('vi-VN'),
       roomPriceInText: numberToVietnameseText(roomPrice),
       roomDeposit: roomDeposit.toLocaleString('vi-VN'),
       roomDepositInText: numberToVietnameseText(roomDeposit),
       roomFirstMonthTotal: roomFirstMonthTotal.toLocaleString('vi-VN'),
       roomFirstMonthTotalInText: numberToVietnameseText(roomFirstMonthTotal),
-      roomElectricFee: Number(
-        room.price_per_electricity_unit || room.fixed_electricity_fee,
-      ).toLocaleString('vi-VN'),
-      roomInternetFee: '100,000', // Fixed value, will be configurable later
-      roomWaterFee: Number(
-        room.price_per_water_unit || room.fixed_water_fee,
-      ).toLocaleString('vi-VN'),
+      roomElectricFee: roomElectricFee,
+      roomInternetFee: `${Number(room.internet_fee).toLocaleString('vi-VN')} đồng/phòng`,
+      roomWaterFee: room.fixed_water_fee,
       roomCleaningFee: Number(room.cleaning_fee).toLocaleString('vi-VN'),
-      roomWaterByMeter: '25,000', // Fixed value
+      roomWaterByMeter: room.price_per_water_unit,
       roomLivingExpense: Number(room.living_fee).toLocaleString('vi-VN'),
-
-      // Contract dates
-      contractStartDate: dayjs(startDate).format('DD/MM/YYYY'),
-      contractEndDate: dayjs(endDate).format('DD/MM/YYYY'),
-      contractSignDate: dayjs().format('DD/MM/YYYY'),
-
-      // Property info
-      propertyAddress:
-        'Số 16, Ngõ 66 Đường Giáp Bát, Phường Giáp Bát, Quận Hoàng Mai, TP Hà Nội',
-      roomNumber: room.name,
     };
 
     return contractData;
   }
 
   async generateAndSaveContract(
-    roomId: string,
-    tenantId: string,
-    ownerId: string,
+    owner: UserEntity,
+    room: RoomEntity,
+    tenants: TenantEntity[],
+    contractPayload: CreateContractDto,
   ): Promise<{ buffer: Buffer; file: any }> {
-    const result = await this.generateContract(roomId, tenantId, ownerId, true);
+    const result = await this.generateContract(
+      owner,
+      room,
+      tenants,
+      contractPayload,
+    );
     if (!result.file) {
       throw new BadRequestException('Failed to save contract file');
     }
@@ -188,17 +161,18 @@ export class ContractsService {
   }
 
   async generateContract(
-    roomId: string,
-    tenantId: string,
-    ownerId: string,
-    saveToFile: boolean = false,
+    owner: UserEntity,
+    room: RoomEntity,
+    tenants: TenantEntity[],
+    contractPayload: CreateContractDto,
   ): Promise<{ buffer: Buffer; file?: any }> {
     try {
       // Get contract data
       const contractData = await this.generateContractData(
-        roomId,
-        tenantId,
-        ownerId,
+        owner,
+        room,
+        tenants,
+        contractPayload,
       );
 
       // Read the template file
@@ -236,11 +210,12 @@ export class ContractsService {
         compression: 'DEFLATE',
       });
 
-      let file: any;
-
-      if (saveToFile) {
-        file = await this.saveContractToMinio(buffer, contractData, ownerId);
-      }
+      const file = await this.saveContractToMinio(
+        buffer,
+        contractData,
+        owner.id,
+        room,
+      );
 
       return { buffer, file };
     } catch (error) {
@@ -260,17 +235,20 @@ export class ContractsService {
     buffer: Buffer,
     contractData: any,
     ownerId: string,
+    room: RoomEntity,
   ): Promise<any> {
     try {
       // Generate filename with timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const fileName = `contract-${contractData.tenantName}-${contractData.roomNumber}-${timestamp}.docx`;
+      const fileName = `contract-${timestamp}.docx`;
+      const filePath = `${ownerId}/${room.house.id}/${room.id}/${fileName}`;
 
       // Upload to Minio
-      const savedFile = await this.fileService.uploadBuffer(
+      const savedFile = await this.fileService.uploadBufferWithCustomPath(
         buffer,
-        fileName,
+        filePath,
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        fileName,
         ownerId,
       );
 
@@ -284,66 +262,60 @@ export class ContractsService {
     }
   }
 
-  async findAll(): Promise<ContractEntity[]> {
-    return await this.contractsRepository.findAll();
-  }
+  async validate(
+    contractData: CreateContractDto,
+    userJwtPayload: JwtPayloadType,
+  ) {
+    const { roomId, tenants } = contractData;
 
-  async findById(id: string): Promise<ContractEntity> {
-    const contract = await this.contractsRepository.findById(id);
-    if (!contract) {
-      throw new NotFoundException(`Contract with ID ${id} not found`);
+    const owner = await this.userService.findById(userJwtPayload.id);
+    if (!owner) {
+      this.logger.error(`[logMsg]`);
+      throw new UnprocessableEntityException({
+        status: HttpStatus.BAD_REQUEST,
+        message: '[errMsg]',
+      });
     }
-    return contract;
-  }
 
-  async findByTenant(tenantId: string): Promise<ContractEntity[]> {
-    return await this.contractsRepository.findByTenant(tenantId);
-  }
-
-  async findByOwner(ownerId: string): Promise<ContractEntity[]> {
-    return await this.contractsRepository.findByOwner(ownerId);
-  }
-
-  async findByRoom(roomId: string): Promise<ContractEntity[]> {
-    return await this.contractsRepository.findByRoom(roomId);
-  }
-
-  async findByFile(fileId: string): Promise<ContractEntity | null> {
-    return await this.contractsRepository.findByFile(fileId);
-  }
-
-  async findByStatus(statusId: string): Promise<ContractEntity[]> {
-    return await this.contractsRepository.findByStatus(statusId);
-  }
-
-  async update(
-    id: string,
-    updateData: Partial<ContractEntity>,
-  ): Promise<ContractEntity> {
-    const contract = await this.contractsRepository.update(id, updateData);
-    if (!contract) {
-      throw new NotFoundException(`Contract with ID ${id} not found`);
+    const room = await this.roomService.findById(roomId, owner.id);
+    if (!room) {
+      this.logger.error(`[logMsg]`);
+      throw new UnprocessableEntityException({
+        status: HttpStatus.BAD_REQUEST,
+        message: '[errMsg]',
+      });
     }
-    return contract;
-  }
 
-  async softDelete(id: string): Promise<boolean> {
-    const deleted = await this.contractsRepository.softDelete(id);
-    if (!deleted) {
-      throw new NotFoundException(`Contract with ID ${id} not found`);
-    }
-    return deleted;
-  }
+    const listTenants: TenantEntity[] = [];
+    const getTenantsPromises: Promise<TenantEntity | null>[] = [];
 
-  async restore(id: string): Promise<boolean> {
-    const restored = await this.contractsRepository.restore(id);
-    if (!restored) {
-      throw new NotFoundException(`Contract with ID ${id} not found`);
-    }
-    return restored;
-  }
+    tenants.forEach((elm) => {
+      getTenantsPromises.push(this.tenantService.findById(elm, ['room']));
+    });
 
-  async count(): Promise<number> {
-    return await this.contractsRepository.count();
+    const responseTenants = await Promise.allSettled(getTenantsPromises);
+    responseTenants.forEach((res) => {
+      if (res.status === 'rejected' || !res.value) {
+        throw new UnprocessableEntityException({
+          status: HttpStatus.BAD_REQUEST,
+          message: '[errMsg]',
+        });
+      }
+
+      if (res.value.room.id !== room.id) {
+        throw new UnprocessableEntityException({
+          status: HttpStatus.BAD_REQUEST,
+          message: '[errMsg]',
+        });
+      }
+
+      listTenants.push(res.value);
+    });
+
+    return {
+      owner,
+      room,
+      tenants: listTenants,
+    };
   }
 }

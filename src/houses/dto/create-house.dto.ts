@@ -13,4 +13,20 @@ export class CreateHouseDto {
   })
   @IsOptional()
   description?: string;
+
+  @ApiProperty({
+    example: 'My house address',
+    type: String,
+    nullable: true,
+  })
+  @IsOptional()
+  address?: string;
+
+  @ApiProperty({
+    example: 'My house overRentalFee',
+    type: String,
+    nullable: true,
+  })
+  @IsOptional()
+  overRentalFee?: string;
 }

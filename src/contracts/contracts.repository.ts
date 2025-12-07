@@ -33,22 +33,6 @@ export class ContractsRepository {
     return await this.contractRepository.find(defaultOptions);
   }
 
-  async findByTenant(tenantId: string): Promise<ContractEntity[]> {
-    return await this.contractRepository.find({
-      where: { tenant: { id: tenantId } },
-      relations: ['owner', 'tenant', 'room', 'file', 'status'],
-      order: { createdAt: 'DESC' },
-    });
-  }
-
-  async findByOwner(ownerId: string): Promise<ContractEntity[]> {
-    return await this.contractRepository.find({
-      where: { owner: { id: ownerId } },
-      relations: ['owner', 'tenant', 'room', 'file', 'status'],
-      order: { createdAt: 'DESC' },
-    });
-  }
-
   async findByRoom(roomId: string): Promise<ContractEntity[]> {
     return await this.contractRepository.find({
       where: { room: { id: roomId } },

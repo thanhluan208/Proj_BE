@@ -116,6 +116,13 @@ export class RoomsService {
       throw new BadRequestException('cleaning_fee must be positive number');
     }
 
+    if (
+      createRoomDto.internet_fee !== undefined &&
+      Number(createRoomDto.internet_fee) < 0
+    ) {
+      throw new BadRequestException('internet_fee must be positive number');
+    }
+
     const room = await this.roomsRepository.create({
       ...createRoomDto,
       house: house,

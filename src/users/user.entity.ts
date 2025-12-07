@@ -38,6 +38,42 @@ export class UserEntity extends EntityRelationalHelper {
 
   @ApiProperty({
     type: String,
+    example: '0909090909',
+    nullable: true,
+    required: false,
+  })
+  @Column({ type: String, nullable: true })
+  phoneNumber?: string;
+
+  @ApiProperty({
+    type: String,
+    example: '0909090909',
+    nullable: true,
+    required: false,
+  })
+  @Column({ type: String, nullable: true })
+  bankAccountName?: string;
+
+  @ApiProperty({
+    type: String,
+    example: '0909090909',
+    nullable: true,
+    required: false,
+  })
+  @Column({ type: String, nullable: true })
+  bankAccountNumber?: string;
+
+  @ApiProperty({
+    type: String,
+    example: '0909090909',
+    nullable: true,
+    required: false,
+  })
+  @Column({ type: String, nullable: true })
+  bankName?: string;
+
+  @ApiProperty({
+    type: String,
     example: 'email',
   })
   @Expose({ groups: ['admin'] })

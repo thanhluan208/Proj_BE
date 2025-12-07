@@ -94,6 +94,10 @@ export class UserService {
       status: status as any,
       email: createUserDto.email,
       password: hashedPassword,
+      phoneNumber: createUserDto.phoneNumber,
+      bankAccountName: createUserDto.bankAccountName,
+      bankAccountNumber: createUserDto.bankAccountNumber,
+      bankName: createUserDto.bankName,
     });
     this.logger.log(`User entity created for email: ${createUserDto.email}`);
 
@@ -229,6 +233,10 @@ export class UserService {
       role: role as any,
       status: status as any,
       provider: updateUserDto.provider,
+      phoneNumber: updateUserDto.phoneNumber,
+      bankAccountName: updateUserDto.bankAccountName,
+      bankAccountNumber: updateUserDto.bankAccountNumber,
+      bankName: updateUserDto.bankName,
     });
   }
 

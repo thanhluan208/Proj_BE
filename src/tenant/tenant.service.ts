@@ -4,24 +4,24 @@ import {
   Logger,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { JwtPayloadType } from 'src/auth/strategies/types/jwt-payload.type';
+import { FilesService } from 'src/files/files.service';
 import { HousesService } from 'src/houses/houses.service';
 import { RoomsService } from 'src/rooms/rooms.service';
+import { StatusEntity } from 'src/statuses/status.entity';
+import { StatusEnum } from 'src/statuses/statuses.enum';
 import { UserService } from 'src/users/users.service';
-import { CreateTenantDto } from './dto/create-tenant.dto';
-import { UpdateTenantDto } from './dto/update-tenant.dto';
-import { JwtPayloadType } from 'src/auth/strategies/types/jwt-payload.type';
-import { GetTenantDto } from './dto/get-tenant.dto';
 import {
   PaginatedResponseDto,
   PaginationInfoResponseDto,
 } from 'src/utils/dto/paginated-response.dto';
-import { TenantRepository } from './tenant.repository';
-import { TenantEntity } from './tenant.entity';
 import { VisionService } from 'src/vision/vision.service';
-import { FilesService } from 'src/files/files.service';
-import { StatusEnum } from 'src/statuses/statuses.enum';
-import { StatusEntity } from 'src/statuses/status.entity';
+import { CreateTenantDto } from './dto/create-tenant.dto';
+import { GetTenantDto } from './dto/get-tenant.dto';
+import { UpdateTenantDto } from './dto/update-tenant.dto';
+import { TenantEntity } from './tenant.entity';
 import { TenantHelper } from './tenant.helper';
+import { TenantRepository } from './tenant.repository';
 
 @Injectable()
 export class TenantService {
@@ -349,14 +349,17 @@ export class TenantService {
     return { total };
   }
 
-  async findById(id: string) {
+  async findById(id: string, relations?: string[]) {
     this.logger.log(`Finding tenant with ID: ${id}`);
 
-    const tenant = await this.tenantRepository.findById(id);
+    const tenant = await this.tenantRepository.findById(id, relations);
 
     if (!tenant) {
       this.logger.warn(`Tenant not found with ID: ${id}`);
-      return null;
+      throw new UnprocessableEntityException({
+        status: HttpStatus.BAD_REQUEST,
+        message: `Tenant not found with ID: ${id}`,
+      });
     }
 
     this.logger.log(`Found tenant with ID: ${id}`);

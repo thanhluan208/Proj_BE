@@ -73,4 +73,13 @@ export class CreateRoomDto {
   @IsOptional()
   @IsNumber()
   cleaning_fee?: number;
+
+  @ApiProperty({ example: 100000 })
+  @IsOptional()
+  @IsNumber()
+  internet_fee?: number;
+
+  @ApiProperty({ example: '2024-01-01' })
+  @IsOptional()
+  paymentDate?: Date;
 }

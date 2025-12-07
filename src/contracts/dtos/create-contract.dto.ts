@@ -1,5 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import {
+  IsDateString,
+  IsNotEmpty,
+  IsNumberString,
+  IsString,
+} from 'class-validator';
 
 export class CreateContractDto {
   @ApiProperty({
@@ -13,10 +18,96 @@ export class CreateContractDto {
 
   @ApiProperty({
     type: String,
-    description: 'The ID of the tenant',
-    example: '123e4567-e89b-12d3-a456-426614174000',
+    description: 'The created day of the contract',
+    example: '2024-01-01',
   })
-  @IsNotEmpty()
+  @IsDateString()
+  createdDate: string;
+
+  @ApiProperty({
+    type: [String],
+    description: 'List of tenant IDs',
+    example: ['123e4567-e89b-12d3-a456-426614174000'],
+  })
+  @IsString({ each: true })
+  tenants: string[];
+
+  houseInfo: HouseInfo;
+  bankInfo: BankInfo;
+}
+
+class HouseInfo {
+  @ApiProperty({
+    type: String,
+    description: 'The address of the house',
+    example: '123 Main St',
+    required: false,
+  })
   @IsString()
-  tenantId: string;
+  houseAddress?: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'The owner of the house',
+    example: 'John Doe',
+    required: false,
+  })
+  @IsString()
+  houseOwner?: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'The owner of the house',
+    example: 'John Doe',
+    required: false,
+  })
+  @IsString()
+  houseOwnerPhoneNumber?: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'The owner of the house',
+    example: 'John Doe',
+    required: false,
+  })
+  @IsString()
+  houseOwnerBackupPhoneNumber?: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'The owner of the house',
+    example: 'John Doe',
+    required: false,
+  })
+  @IsNumberString()
+  overRentalFee?: string;
+}
+
+class BankInfo {
+  @ApiProperty({
+    type: String,
+    description: 'The owner of the house',
+    example: 'John Doe',
+    required: false,
+  })
+  @IsString()
+  bankAccountName?: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'The owner of the house',
+    example: 'John Doe',
+    required: false,
+  })
+  @IsNumberString()
+  bankAccountNumber?: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'The owner of the house',
+    example: 'John Doe',
+    required: false,
+  })
+  @IsString()
+  bankName?: string;
 }
