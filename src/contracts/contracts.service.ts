@@ -58,7 +58,8 @@ export class ContractsService {
     tenants: TenantEntity[],
     contractPayload: CreateContractDto,
   ) {
-    const { createdDate, houseInfo, bankInfo } = contractPayload;
+    const { createdDate, houseInfo, bankInfo, startDate, endDate } =
+      contractPayload;
     const {
       houseOwner,
       houseAddress,
@@ -73,10 +74,10 @@ export class ContractsService {
 
     const firstTenant = tenants[0];
 
-    // Calculate contract dates
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setFullYear(startDate.getFullYear() + 1);
+    const startDay = dayjs(startDate);
+    const endDay = dayjs(endDate);
+
+    const duration = dayjs(endDay).diff(startDay, 'month');
 
     // Calculate pricing
     const roomPrice = Number(room.base_rent);
@@ -85,21 +86,21 @@ export class ContractsService {
 
     const tenantsData = cloneDeep(tenants).map((elm) => {
       return {
-        name: firstTenant.name || 'N/A',
-        phone: firstTenant.phoneNumber || 'N/A',
-        citizenId: firstTenant.citizenId || 'N/A',
-        citizenIdCreatedAt: firstTenant.issueDate || 'N/A',
-        citizenIdCreatedBy: firstTenant.issueLoc || 'N/A',
+        name: elm.name || 'N/A',
+        phone: elm.phoneNumber || 'N/A',
+        citizenId: elm.citizenId || 'N/A',
+        citizenIdCreatedAt: elm.issueDate
+          ? dayjs(elm.issueDate).format('[Ngày] DD [tháng] MM [năm] YYYY')
+          : 'N/A',
+        citizenIdCreatedBy: elm.issueLoc || 'N/A',
+        citizenIdAddress: elm.address || 'N/A',
       };
     });
 
-    const roomElectricFee = room.price_per_electricity_unit
-      ? `${Number(room.price_per_electricity_unit).toLocaleString('vi-VN')} đồng/kwh`
-      : `${Number(room.fixed_electricity_fee).toLocaleString('vi-VN')} đồng/người`;
-
-    const roomWaterFee = room.price_per_water_unit
-      ? `${Number(room.price_per_water_unit).toLocaleString('vi-VN')} đồng/m3`
-      : `${Number(room.fixed_water_fee).toLocaleString('vi-VN')} đồng/người`;
+    const roomElectricFee =
+      room.price_per_electricity_unit > 0
+        ? `${Number(room.price_per_electricity_unit).toLocaleString('vi-VN')} đồng/kwh`
+        : `${Number(room.fixed_electricity_fee).toLocaleString('vi-VN')} đồng/người`;
 
     const contractData = {
       createdDay: dayjs(createdDate).format('DD'),
@@ -115,16 +116,23 @@ export class ContractsService {
 
       mainTenantName: firstTenant.name,
       mainTenantPhone: firstTenant.phoneNumber,
+      mainTenantCitizenIdAddress: firstTenant.address,
       mainTenantCitizenId: firstTenant.citizenId,
-      mainTenantCitizenIdCreatedAt: firstTenant.issueDate,
+      mainTenantCitizenIdCreatedAt: firstTenant.issueDate
+        ? dayjs(firstTenant.issueDate).format('[Ngày] DD [tháng] MM [năm] YYYY')
+        : 'N/A',
       mainTenantCitizenIdCreatedBy: firstTenant.issueLoc,
       mainTenantJob: firstTenant.tenantJob,
       mainTenantWorkAt: firstTenant.tenantWorkAt,
 
       tenants: tenantsData,
+      totalTenant: String(tenants.length).padStart(2, '0'),
 
-      overRentalFee: overRentalFee || house.overRentalFee,
+      overRentalFee: Number(
+        overRentalFee || house.overRentalFee || 0,
+      ).toLocaleString('vi-VN'),
 
+      roomName: room.name,
       roomPrice: roomPrice.toLocaleString('vi-VN'),
       roomPriceInText: numberToVietnameseText(roomPrice),
       roomDeposit: roomDeposit.toLocaleString('vi-VN'),
@@ -133,11 +141,21 @@ export class ContractsService {
       roomFirstMonthTotalInText: numberToVietnameseText(roomFirstMonthTotal),
       roomElectricFee: roomElectricFee,
       roomInternetFee: `${Number(room.internet_fee).toLocaleString('vi-VN')} đồng/phòng`,
-      roomWaterFee: room.fixed_water_fee,
-      roomCleaningFee: Number(room.cleaning_fee).toLocaleString('vi-VN'),
-      roomWaterByMeter: room.price_per_water_unit,
-      roomLivingExpense: Number(room.living_fee).toLocaleString('vi-VN'),
+      roomWaterFee: `${Number(room.fixed_water_fee).toLocaleString('vi-VN')} đồng/người`,
+      roomCleaningFee: `${Number(room.cleaning_fee).toLocaleString('vi-VN')} đồng/người`,
+      roomWaterByMeter: `${Number(room.price_per_water_unit).toLocaleString('vi-VN')} đồng/m³`,
+      roomLivingExpense: `${Number(room.living_fee).toLocaleString('vi-VN')} đồng/người`,
+
+      startDate: startDay.format('[Ngày] DD [tháng] MM [năm] YYYY'),
+      endDate: endDay.format('[Ngày] DD [tháng] MM [năm] YYYY'),
+      duration,
     };
+
+    Object.keys(contractData).forEach((key) => {
+      if (!contractData[key]) {
+        contractData[key] = 'N/A';
+      }
+    });
 
     return contractData;
   }
