@@ -7,11 +7,12 @@ import { BillingEntity } from './billing.entity';
 import { BillingController } from './billing.controller';
 import { BillingRepository } from './billing.repository';
 import { BillingService } from './billing.service';
+import { ContractsModule } from 'src/contracts/contracts.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([BillingEntity]),
-    RoomModule,
+    ContractsModule,
     TenantModule,
     RedisModule,
   ],

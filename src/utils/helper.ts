@@ -100,3 +100,30 @@ export function getByPath(obj: unknown, path?: string): unknown {
   // Return final value or undefined
   return cur;
 }
+
+/**
+ * Retrieves a value from two objects by checking object A first, then object B
+ * @param objA - First object to check
+ * @param objB - Second object to check
+ * @param key - Key to look up
+ * @returns The value from objA[key], objB[key], or "N/A" if not found in either
+ */
+export function getValueFromObjects<T extends Record<string, any>, Y>(
+  objA: T | null | undefined,
+  objB: T | null | undefined,
+  key: keyof T,
+  defaultValue: Y,
+): T[keyof T] | Y {
+  // Check if key exists in object A and has a defined value
+  if (objA && key in objA && objA[key] !== undefined && objA[key] !== null) {
+    return objA[key];
+  }
+
+  // Check if key exists in object B and has a defined value
+  if (objB && key in objB && objB[key] !== undefined && objB[key] !== null) {
+    return objB[key];
+  }
+
+  // Return "N/A" if key doesn't exist in either object
+  return defaultValue;
+}

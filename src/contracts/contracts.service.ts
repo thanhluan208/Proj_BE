@@ -23,6 +23,10 @@ import { ContractsRepository } from './contracts.repository';
 import { CreateContractDto } from './dtos/create-contract.dto';
 
 import { cloneDeep } from 'lodash';
+import { FileEntity } from 'src/files/file.entity';
+import { ContractEntity } from './contract.entity';
+import { StatusEnum } from 'src/statuses/statuses.enum';
+import { StatusEntity } from 'src/statuses/status.entity';
 
 @Injectable()
 export class ContractsService {
@@ -45,11 +49,30 @@ export class ContractsService {
       userJwtPayload,
     );
 
-    await this.generateAndSaveContract(owner, room, tenants, contractData);
+    const { file } = await this.generateAndSaveContract(
+      owner,
+      room,
+      tenants,
+      contractData,
+    );
+
+    this.contractsRepository.create({
+      room: {
+        id: room.id,
+      } as RoomEntity,
+      file: file,
+      status: {
+        id: StatusEnum.active,
+      } as StatusEntity,
+    });
 
     return {
       message: 'Contract created and saved successfully',
     };
+  }
+
+  async getContractByRoom(roomId: string, relations?: string[]) {
+    return this.contractsRepository.findByRoom(roomId, relations);
   }
 
   generateContractData(
@@ -58,7 +81,7 @@ export class ContractsService {
     tenants: TenantEntity[],
     contractPayload: CreateContractDto,
   ) {
-    const { createdDate, houseInfo, bankInfo, startDate, endDate } =
+    const { createdDate, houseInfo, bankInfo, startDate, endDate, feeInfo } =
       contractPayload;
     const {
       houseOwner,
@@ -80,7 +103,7 @@ export class ContractsService {
     const duration = dayjs(endDay).diff(startDay, 'month');
 
     // Calculate pricing
-    const roomPrice = Number(room.base_rent);
+    const roomPrice = Number(feeInfo.base_rent);
     const roomDeposit = roomPrice; // Assuming deposit equals one month rent
     const roomFirstMonthTotal = roomPrice + roomDeposit;
 
@@ -98,9 +121,10 @@ export class ContractsService {
     });
 
     const roomElectricFee =
-      room.price_per_electricity_unit > 0
-        ? `${Number(room.price_per_electricity_unit).toLocaleString('vi-VN')} đồng/kwh`
-        : `${Number(room.fixed_electricity_fee).toLocaleString('vi-VN')} đồng/người`;
+      feeInfo.price_per_electricity_unit &&
+      feeInfo.price_per_electricity_unit > 0
+        ? `${Number(feeInfo.price_per_electricity_unit).toLocaleString('vi-VN')} đồng/kwh`
+        : `${Number(feeInfo.fixed_electricity_fee).toLocaleString('vi-VN')} đồng/người`;
 
     const contractData = {
       createdDay: dayjs(createdDate).format('DD'),
@@ -128,9 +152,7 @@ export class ContractsService {
       tenants: tenantsData,
       totalTenant: String(tenants.length).padStart(2, '0'),
 
-      overRentalFee: Number(
-        overRentalFee || house.overRentalFee || 0,
-      ).toLocaleString('vi-VN'),
+      overRentalFee: Number(overRentalFee || 0).toLocaleString('vi-VN'),
 
       roomName: room.name,
       roomPrice: roomPrice.toLocaleString('vi-VN'),
@@ -140,11 +162,11 @@ export class ContractsService {
       roomFirstMonthTotal: roomFirstMonthTotal.toLocaleString('vi-VN'),
       roomFirstMonthTotalInText: numberToVietnameseText(roomFirstMonthTotal),
       roomElectricFee: roomElectricFee,
-      roomInternetFee: `${Number(room.internet_fee).toLocaleString('vi-VN')} đồng/phòng`,
-      roomWaterFee: `${Number(room.fixed_water_fee).toLocaleString('vi-VN')} đồng/người`,
-      roomCleaningFee: `${Number(room.cleaning_fee).toLocaleString('vi-VN')} đồng/người`,
-      roomWaterByMeter: `${Number(room.price_per_water_unit).toLocaleString('vi-VN')} đồng/m³`,
-      roomLivingExpense: `${Number(room.living_fee).toLocaleString('vi-VN')} đồng/người`,
+      roomInternetFee: `${Number(feeInfo.internet_fee).toLocaleString('vi-VN')} đồng/phòng`,
+      roomWaterFee: `${Number(feeInfo.fixed_water_fee).toLocaleString('vi-VN')} đồng/người`,
+      roomCleaningFee: `${Number(feeInfo.cleaning_fee).toLocaleString('vi-VN')} đồng/người`,
+      roomWaterByMeter: `${Number(feeInfo.price_per_water_unit).toLocaleString('vi-VN')} đồng/m³`,
+      roomLivingExpense: `${Number(feeInfo.living_fee).toLocaleString('vi-VN')} đồng/người`,
 
       startDate: startDay.format('[Ngày] DD [tháng] MM [năm] YYYY'),
       endDate: endDay.format('[Ngày] DD [tháng] MM [năm] YYYY'),
@@ -165,7 +187,7 @@ export class ContractsService {
     room: RoomEntity,
     tenants: TenantEntity[],
     contractPayload: CreateContractDto,
-  ): Promise<{ buffer: Buffer; file: any }> {
+  ): Promise<{ buffer: Buffer; file: FileEntity }> {
     const result = await this.generateContract(
       owner,
       room,
@@ -254,7 +276,7 @@ export class ContractsService {
     contractData: any,
     ownerId: string,
     room: RoomEntity,
-  ): Promise<any> {
+  ): Promise<FileEntity> {
     try {
       // Generate filename with timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -284,7 +306,7 @@ export class ContractsService {
     contractData: CreateContractDto,
     userJwtPayload: JwtPayloadType,
   ) {
-    const { roomId, tenants } = contractData;
+    const { roomId, tenants, feeInfo } = contractData;
 
     const owner = await this.userService.findById(userJwtPayload.id);
     if (!owner) {
@@ -302,6 +324,54 @@ export class ContractsService {
         status: HttpStatus.BAD_REQUEST,
         message: '[errMsg]',
       });
+    }
+
+    // Validation
+    const {
+      price_per_electricity_unit = 0,
+      fixed_electricity_fee = 0,
+      price_per_water_unit = 0,
+      fixed_water_fee = 0,
+      base_rent,
+      living_fee,
+      parking_fee,
+      cleaning_fee,
+      internet_fee,
+    } = feeInfo;
+
+    if (
+      Number(price_per_electricity_unit) <= 0 &&
+      Number(fixed_electricity_fee) <= 0
+    ) {
+      throw new BadRequestException(
+        'Either price_per_electricity_unit or fixed_electricity_fee must be greater than 0',
+      );
+    }
+
+    if (Number(price_per_water_unit) <= 0 && Number(fixed_water_fee) <= 0) {
+      throw new BadRequestException(
+        'Either price_per_water_unit or fixed_water_fee must be greater than 0',
+      );
+    }
+
+    if (Number(base_rent) <= 0) {
+      throw new BadRequestException('base_rent must be greater than 0');
+    }
+
+    if (living_fee !== undefined && Number(living_fee) < 0) {
+      throw new BadRequestException('living_fee must be positive number');
+    }
+
+    if (parking_fee !== undefined && Number(parking_fee) < 0) {
+      throw new BadRequestException('parking_fee must be positive number');
+    }
+
+    if (cleaning_fee !== undefined && Number(cleaning_fee) < 0) {
+      throw new BadRequestException('cleaning_fee must be positive number');
+    }
+
+    if (internet_fee !== undefined && Number(internet_fee) < 0) {
+      throw new BadRequestException('internet_fee must be positive number');
     }
 
     const listTenants: TenantEntity[] = [];

@@ -442,7 +442,7 @@ export class TenantService {
     );
 
     // Determine new status by toggling current status
-    const currentStatus = tenant.status?.id || StatusEnum.inactive;
+    const currentStatus = tenant.status?.id;
     const newStatus =
       currentStatus === StatusEnum.active
         ? StatusEnum.inactive

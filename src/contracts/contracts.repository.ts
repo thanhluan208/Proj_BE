@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindOptionsWhere, FindManyOptions } from 'typeorm';
 import { ContractEntity } from './contract.entity';
+import { StatusEnum } from 'src/statuses/statuses.enum';
 
 @Injectable()
 export class ContractsRepository {
@@ -33,25 +34,13 @@ export class ContractsRepository {
     return await this.contractRepository.find(defaultOptions);
   }
 
-  async findByRoom(roomId: string): Promise<ContractEntity[]> {
-    return await this.contractRepository.find({
-      where: { room: { id: roomId } },
-      relations: ['owner', 'tenant', 'room', 'file', 'status'],
-      order: { createdAt: 'DESC' },
-    });
-  }
-
-  async findByFile(fileId: string): Promise<ContractEntity | null> {
+  async findByRoom(
+    roomId: string,
+    relations?: string[],
+  ): Promise<ContractEntity | null> {
     return await this.contractRepository.findOne({
-      where: { file: { id: fileId } },
-      relations: ['owner', 'tenant', 'room', 'file', 'status'],
-    });
-  }
-
-  async findByStatus(statusId: string): Promise<ContractEntity[]> {
-    return await this.contractRepository.find({
-      where: { status: { id: statusId } as any },
-      relations: ['owner', 'tenant', 'room', 'file', 'status'],
+      where: { room: { id: roomId }, status: { id: StatusEnum.active } },
+      relations: relations,
       order: { createdAt: 'DESC' },
     });
   }

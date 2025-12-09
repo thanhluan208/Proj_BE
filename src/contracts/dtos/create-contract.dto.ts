@@ -3,6 +3,7 @@ import { Transform, Type } from 'class-transformer';
 import {
   IsDateString,
   IsNotEmpty,
+  IsNumber,
   IsNumberString,
   IsOptional,
   IsString,
@@ -95,6 +96,55 @@ class BankInfo {
   bankName?: string;
 }
 
+class FeeInfo {
+  @ApiProperty({
+    example: 5000000,
+    type: Number,
+    description: 'Base rent in VND',
+  })
+  @IsNumber()
+  base_rent: number;
+
+  @ApiProperty({ example: 3000 })
+  @IsOptional()
+  @IsNumber()
+  price_per_electricity_unit?: number;
+
+  @ApiProperty({ example: 10000 })
+  @IsOptional()
+  @IsNumber()
+  price_per_water_unit?: number;
+
+  @ApiProperty({ example: 50000 })
+  @IsOptional()
+  @IsNumber()
+  fixed_water_fee?: number;
+
+  @ApiProperty({ example: 50000 })
+  @IsOptional()
+  @IsNumber()
+  fixed_electricity_fee?: number;
+
+  @ApiProperty({ example: 100000 })
+  @IsOptional()
+  @IsNumber()
+  living_fee?: number;
+
+  @ApiProperty({ example: 100000 })
+  @IsOptional()
+  @IsNumber()
+  parking_fee?: number;
+
+  @ApiProperty({ example: 50000 })
+  @IsOptional()
+  @IsNumber()
+  cleaning_fee?: number;
+
+  @ApiProperty({ example: 100000 })
+  @IsOptional()
+  @IsNumber()
+  internet_fee?: number;
+}
 export class CreateContractDto {
   @ApiProperty({
     type: String,
@@ -144,4 +194,8 @@ export class CreateContractDto {
   @ValidateNested()
   @Type(() => BankInfo)
   bankInfo: BankInfo;
+
+  @ValidateNested()
+  @Type(() => FeeInfo)
+  feeInfo: FeeInfo;
 }

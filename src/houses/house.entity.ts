@@ -44,13 +44,6 @@ export class HouseEntity extends EntityRelationalHelper {
     type: String,
     example: 'My house',
   })
-  @Column({ type: String, nullable: true })
-  overRentalFee?: string;
-
-  @ApiProperty({
-    type: String,
-    example: 'My house',
-  })
   @Column({ type: String })
   name: string;
 

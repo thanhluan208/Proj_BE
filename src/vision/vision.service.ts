@@ -47,7 +47,7 @@ export class VisionService {
       };
 
       const result = await this.model.generateContent([prompt, imagePart]);
-      const response = await result.response;
+      const response = result.response;
       const text = response.text();
 
       this.logger.debug(`Raw Gemini response (Front): ${text}`);
@@ -87,7 +87,7 @@ export class VisionService {
       };
 
       const result = await this.model.generateContent([prompt, imagePart]);
-      const response = await result.response;
+      const response = result.response;
       const text = response.text();
 
       this.logger.debug(`Raw Gemini response (Back): ${text}`);

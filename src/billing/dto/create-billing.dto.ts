@@ -3,15 +3,29 @@ import {
   IsDateString,
   IsNotEmpty,
   IsNumber,
+  IsString,
   IsUUID,
   Min,
 } from 'class-validator';
 
 export class CreateBillingDto {
-  @ApiProperty({ example: 'uuid-of-tenant' })
+  @ApiProperty({
+    type: String,
+    description: 'The ID of the tenant',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @IsNotEmpty()
-  @IsUUID()
+  @IsString()
   tenantId: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'The ID of the room',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsNotEmpty()
+  @IsString()
+  roomId: string;
 
   @ApiProperty({ example: '2023-10-01' })
   @IsNotEmpty()
