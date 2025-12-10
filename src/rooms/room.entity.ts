@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { ContractEntity } from 'src/contracts/contract.entity';
 import { HouseEntity } from 'src/houses/house.entity';
 import { StatusEntity } from 'src/statuses/status.entity';
 import { EntityRelationalHelper } from 'src/utils/relational-entity-helper';
@@ -9,6 +10,7 @@ import {
   Entity,
   Index,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -61,6 +63,9 @@ export class RoomEntity extends EntityRelationalHelper {
   })
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   size_sq_m: number;
+
+  @OneToMany(() => ContractEntity, (contract) => contract.room)
+  contracts: ContractEntity[];
 
   @ApiProperty()
   @CreateDateColumn()

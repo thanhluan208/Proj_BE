@@ -27,12 +27,22 @@ import { FileEntity } from 'src/files/file.entity';
 import { ContractEntity } from './contract.entity';
 import { StatusEnum } from 'src/statuses/statuses.enum';
 import { StatusEntity } from 'src/statuses/status.entity';
+import { RedisService } from 'src/redis/redis.service';
+import { REDIS_PREFIX_KEY } from 'src/utils/constant';
 
 @Injectable()
 export class ContractsService {
   private readonly logger = new Logger(RoomsService.name);
+  private readonly CACHE_CONTRACT_TTL = 60 * 5; // Cache for 5 minutes
+  private readonly CACHE_ROOM_VERSION_KEY = `${REDIS_PREFIX_KEY.contract}:version`;
+  private readonly CACHED_KEY = {
+    getActiveContractByRoom: 'getActiveContractByRoom',
+    getContractsByRoom: 'getContractsByRoom',
+  };
 
   constructor(
+    private redisService: RedisService,
+
     private readonly contractsRepository: ContractsRepository,
     private readonly tenantService: TenantService,
     private readonly roomService: RoomsService,
@@ -64,6 +74,10 @@ export class ContractsService {
       status: {
         id: StatusEnum.active,
       } as StatusEntity,
+      createdDate: dayjs(contractData.createdDate).toDate(),
+      endDate: dayjs(contractData.endDate).toDate(),
+      startDate: dayjs(contractData.startDate).toDate(),
+      ...contractData.feeInfo,
     });
 
     return {
@@ -71,8 +85,100 @@ export class ContractsService {
     };
   }
 
-  async getContractByRoom(roomId: string, relations?: string[]) {
-    return this.contractsRepository.findByRoom(roomId, relations);
+  async getActiveContractByRoom(
+    roomId: string,
+    userId: string,
+    relations?: string[],
+  ) {
+    const cachedKey = `${this.CACHED_KEY.getActiveContractByRoom}:${roomId}`;
+
+    const room = this.roomService.findById(roomId, userId);
+    if (!room) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: '[msg]',
+      });
+    }
+
+    let contract = await this.redisService.get(cachedKey).then((res) => {
+      if (res) {
+        return JSON.parse(res) as ContractEntity;
+      } else {
+        return null;
+      }
+    });
+
+    if (contract) return contract;
+
+    contract = await this.contractsRepository.findOneByRoom(
+      roomId,
+      StatusEnum.active,
+      relations,
+    );
+    this.redisService.set(
+      cachedKey,
+      JSON.stringify(contract),
+      this.CACHE_CONTRACT_TTL,
+    );
+
+    return contract;
+  }
+
+  async findContractsByRoom(
+    roomId: string,
+    userId: string,
+    options: {
+      page?: number;
+      pageSize?: number;
+      status?: string;
+    },
+  ) {
+    const cacheVersion =
+      (await this.redisService.get(
+        `${this.CACHE_ROOM_VERSION_KEY}:${roomId}`,
+      )) ?? '0';
+
+    const room = this.roomService.findById(roomId, userId);
+    if (!room) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: '[msg]',
+      });
+    }
+
+    const page = options.page || 1;
+    const pageSize = options.pageSize || 10;
+    const skip = (page - 1) * pageSize;
+
+    const cacheKey = `${REDIS_PREFIX_KEY.room}:${roomId}:${page}:${pageSize}:v${cacheVersion}`;
+
+    let contracts: ContractEntity[] = [];
+
+    const cachedContracts = await this.redisService.get(cacheKey);
+    if (cachedContracts) {
+      contracts = JSON.parse(cachedContracts);
+    } else {
+      this.logger.log(`Contracts not found in cache for house ID: ${roomId}`);
+      // Get rooms
+      contracts = await this.contractsRepository.findByRoom(roomId, {
+        skip,
+        take: pageSize,
+        status: options.status || 'active',
+      });
+      if (contracts.length > 0 && contracts?.length === pageSize) {
+        await this.redisService.set(
+          cacheKey,
+          JSON.stringify(contracts),
+          this.CACHE_CONTRACT_TTL,
+        );
+      }
+    }
+
+    return {
+      data: contracts,
+      page,
+      pageSize,
+    };
   }
 
   generateContractData(
@@ -88,7 +194,6 @@ export class ContractsService {
       houseAddress,
       houseOwnerBackupPhoneNumber,
       houseOwnerPhoneNumber,
-      overRentalFee,
     } = houseInfo;
 
     const { bankAccountName, bankAccountNumber, bankName } = bankInfo;
@@ -152,7 +257,7 @@ export class ContractsService {
       tenants: tenantsData,
       totalTenant: String(tenants.length).padStart(2, '0'),
 
-      overRentalFee: Number(overRentalFee || 0).toLocaleString('vi-VN'),
+      overRentalFee: Number(feeInfo.overRentalFee || 0).toLocaleString('vi-VN'),
 
       roomName: room.name,
       roomPrice: roomPrice.toLocaleString('vi-VN'),
@@ -323,6 +428,13 @@ export class ContractsService {
       throw new UnprocessableEntityException({
         status: HttpStatus.BAD_REQUEST,
         message: '[errMsg]',
+      });
+    }
+
+    if (!feeInfo) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: '[msg]',
       });
     }
 

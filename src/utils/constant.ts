@@ -7,6 +7,7 @@ export const REDIS_PREFIX_KEY = {
   user: 'user',
   house: 'house',
   room: 'room',
+  contract: 'contract',
 };
 
 export const AUTH_CONSTANTS = {

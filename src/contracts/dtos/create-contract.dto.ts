@@ -50,17 +50,6 @@ class HouseInfo {
   @IsOptional()
   @IsString()
   houseOwnerBackupPhoneNumber?: string;
-
-  @ApiProperty({
-    type: String,
-    description: 'The owner of the house',
-    example: 'John Doe',
-    required: false,
-  })
-  @Transform(({ value }) => (value === '' ? undefined : value))
-  @IsOptional()
-  @IsNumberString()
-  overRentalFee?: string;
 }
 
 class BankInfo {
@@ -102,48 +91,58 @@ class FeeInfo {
     type: Number,
     description: 'Base rent in VND',
   })
-  @IsNumber()
+  @IsNumberString()
   base_rent: number;
 
   @ApiProperty({ example: 3000 })
   @IsOptional()
-  @IsNumber()
+  @IsNumberString()
   price_per_electricity_unit?: number;
 
   @ApiProperty({ example: 10000 })
   @IsOptional()
-  @IsNumber()
+  @IsNumberString()
   price_per_water_unit?: number;
 
   @ApiProperty({ example: 50000 })
   @IsOptional()
-  @IsNumber()
+  @IsNumberString()
   fixed_water_fee?: number;
 
   @ApiProperty({ example: 50000 })
   @IsOptional()
-  @IsNumber()
+  @IsNumberString()
   fixed_electricity_fee?: number;
 
   @ApiProperty({ example: 100000 })
   @IsOptional()
-  @IsNumber()
+  @IsNumberString()
   living_fee?: number;
 
   @ApiProperty({ example: 100000 })
   @IsOptional()
-  @IsNumber()
+  @IsNumberString()
   parking_fee?: number;
 
   @ApiProperty({ example: 50000 })
   @IsOptional()
-  @IsNumber()
+  @IsNumberString()
   cleaning_fee?: number;
 
   @ApiProperty({ example: 100000 })
   @IsOptional()
-  @IsNumber()
+  @IsNumberString()
   internet_fee?: number;
+
+  @ApiProperty({
+    type: String,
+    description: 'The owner of the house',
+    example: 'John Doe',
+    required: false,
+  })
+  @IsOptional()
+  @IsNumberString()
+  overRentalFee?: string;
 }
 export class CreateContractDto {
   @ApiProperty({

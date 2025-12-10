@@ -137,14 +137,6 @@ export class ContractEntity extends EntityRelationalHelper {
   @Column({ type: String, nullable: true })
   overRentalFee?: string;
 
-  @ApiProperty({
-    type: Date,
-    example: '2024-01-01',
-    nullable: true,
-  })
-  @Column({ type: 'date', nullable: true })
-  paymentDate?: Date;
-
   @ApiProperty()
   @CreateDateColumn()
   createdAt: Date;

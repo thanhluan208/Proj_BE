@@ -46,11 +46,11 @@ export class BillingService {
     }
 
     // 2. Verify Ownership via Room
-    const contract = await this.contractService.getContractByRoom(dto.roomId, [
-      'room',
-      'room.house',
-      'room.house.owner',
-    ]);
+    const contract = await this.contractService.getActiveContractByRoom(
+      dto.roomId,
+      user.id,
+      ['room', 'room.house', 'room.house.owner'],
+    );
     if (!contract) {
       throw new BadRequestException({
         status: HttpStatus.BAD_REQUEST,

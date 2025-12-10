@@ -243,7 +243,6 @@ export class RoomsService {
         skip,
         take: pageSize,
       });
-      console.log('Rooms:', rooms);
       if (rooms.length > 0 && rooms?.length === pageSize) {
         await this.redisService.set(
           cacheKey,

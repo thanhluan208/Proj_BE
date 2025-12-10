@@ -35,11 +35,47 @@ export class ContractsRepository {
   }
 
   async findByRoom(
+    room_id: string,
+    options?: {
+      skip?: number;
+      take?: number;
+      status?: string;
+    },
+  ): Promise<ContractEntity[]> {
+    const query = this.contractRepository.createQueryBuilder('contract');
+
+    query
+      .leftJoin('contract.room', 'room')
+      .leftJoinAndSelect('contract.status', 'status')
+      .where('room.id = :roomId', { roomId: room_id })
+      .andWhere('contract.deletedAt IS NULL');
+
+    if (options?.status) {
+      query.andWhere('LOWER(status.name) = LOWER(:status)', {
+        status: options.status,
+      });
+    }
+
+    if (options?.skip) {
+      query.skip(options.skip);
+    }
+
+    if (options?.take) {
+      query.take(options.take);
+    }
+
+    query.orderBy('contract.createdAt', 'DESC');
+
+    return await query.getMany();
+  }
+
+  async findOneByRoom(
     roomId: string,
+    status = StatusEnum.active,
     relations?: string[],
   ): Promise<ContractEntity | null> {
     return await this.contractRepository.findOne({
-      where: { room: { id: roomId }, status: { id: StatusEnum.active } },
+      where: { room: { id: roomId }, status: { id: status } },
       relations: relations,
       order: { createdAt: 'DESC' },
     });

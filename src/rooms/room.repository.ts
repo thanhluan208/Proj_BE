@@ -40,18 +40,21 @@ export class RoomRepository {
   }
 
   async findByHouse(
-    house_id: string,
-    options?: { skip?: number; take?: number },
+    houseId: string,
+    options: { skip: number; take: number },
   ): Promise<RoomEntity[]> {
-    return await this.roomRepository.find({
-      where: {
-        house: { id: house_id },
-        deletedAt: IsNull(),
-        status: { id: StatusEnum.active },
-      },
-      skip: options?.skip,
-      take: options?.take,
-    });
+    return this.roomRepository
+      .createQueryBuilder('room')
+      .leftJoinAndSelect(
+        'room.contracts',
+        'contract',
+        'contract.status = :active', // FILTER HERE
+        { active: StatusEnum.active },
+      )
+      .where('room.houseId = :houseId', { houseId })
+      .skip(options.skip)
+      .take(options.take)
+      .getMany();
   }
 
   async countByHouse(house_id: string): Promise<number> {

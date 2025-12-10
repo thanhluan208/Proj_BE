@@ -284,17 +284,7 @@ export class TenantService {
         errors: { room: 'roomNotFound' },
       });
     }
-    // 2. Get the house and check ownership
-    const house = room.house;
-    if (!house || house.owner?.id !== userId) {
-      this.logger.error(
-        `User ${userId} is not the owner of house ${house?.id}`,
-      );
-      throw new UnprocessableEntityException({
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-        errors: { house: 'notHouseOwner' },
-      });
-    }
+
     // 3. Pagination
     const page = payload.page || 1;
     const pageSize = payload.pageSize || 10;
