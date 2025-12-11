@@ -28,6 +28,7 @@ import { TenantModule } from './tenant/tenant.module';
 import { UsersModule } from './users/users.module';
 import redisConfig from './redis/config/redis.config';
 import { RedisModule } from './redis/redis.module';
+import { TenantContractsModule } from './tenant-contracts/tenant-contracts.module';
 
 @Module({
   imports: [
@@ -97,6 +98,7 @@ import { RedisModule } from './redis/redis.module';
     BillingModule,
     ContractsModule,
     VisionModule,
+    TenantContractsModule,
   ],
   controllers: [HealthController],
   providers: [],

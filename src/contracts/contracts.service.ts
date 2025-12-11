@@ -29,6 +29,8 @@ import { StatusEnum } from 'src/statuses/statuses.enum';
 import { StatusEntity } from 'src/statuses/status.entity';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_PREFIX_KEY } from 'src/utils/constant';
+import { TenantContractsService } from 'src/tenant-contracts/tenant-contracts.service';
+import { TenantContractEntity } from 'src/tenant-contracts/tenant-contracts.entity';
 
 @Injectable()
 export class ContractsService {
@@ -38,6 +40,8 @@ export class ContractsService {
   private readonly CACHED_KEY = {
     getActiveContractByRoom: 'getActiveContractByRoom',
     getContractsByRoom: 'getContractsByRoom',
+    getTotalContractByRoom: 'getTotalContractByRoom',
+    getById: 'getById',
   };
 
   constructor(
@@ -48,6 +52,7 @@ export class ContractsService {
     private readonly roomService: RoomsService,
     private readonly fileService: FilesService,
     private readonly userService: UserService,
+    private readonly tenantContractsService: TenantContractsService,
   ) {}
 
   async create(
@@ -66,7 +71,7 @@ export class ContractsService {
       contractData,
     );
 
-    this.contractsRepository.create({
+    const newContract = await this.contractsRepository.create({
       room: {
         id: room.id,
       } as RoomEntity,
@@ -79,6 +84,19 @@ export class ContractsService {
       startDate: dayjs(contractData.startDate).toDate(),
       ...contractData.feeInfo,
     });
+
+    const createTenantContractQueue: Promise<TenantContractEntity>[] = [];
+
+    tenants.forEach((tent) => {
+      createTenantContractQueue.push(
+        this.tenantContractsService.create({
+          contractId: newContract.id,
+          tenantId: tent.id,
+        }),
+      );
+    });
+
+    await Promise.all(createTenantContractQueue);
 
     return {
       message: 'Contract created and saved successfully',
@@ -150,7 +168,7 @@ export class ContractsService {
     const pageSize = options.pageSize || 10;
     const skip = (page - 1) * pageSize;
 
-    const cacheKey = `${REDIS_PREFIX_KEY.room}:${roomId}:${page}:${pageSize}:v${cacheVersion}`;
+    const cacheKey = `${REDIS_PREFIX_KEY.room}:${roomId}:${JSON.stringify(options)}:v${cacheVersion}`;
 
     let contracts: ContractEntity[] = [];
 
@@ -160,11 +178,11 @@ export class ContractsService {
     } else {
       this.logger.log(`Contracts not found in cache for house ID: ${roomId}`);
       // Get rooms
-      contracts = await this.contractsRepository.findByRoom(roomId, {
+      contracts = (await this.contractsRepository.findByRoom(roomId, {
         skip,
         take: pageSize,
         status: options.status || 'active',
-      });
+      })) as ContractEntity[];
       if (contracts.length > 0 && contracts?.length === pageSize) {
         await this.redisService.set(
           cacheKey,
@@ -179,6 +197,69 @@ export class ContractsService {
       page,
       pageSize,
     };
+  }
+
+  async getTotalContractByRoom(
+    roomId: string,
+    userId: string,
+    options: {
+      status?: string;
+    },
+  ) {
+    const cachedKey = `${this.CACHED_KEY.getTotalContractByRoom}:${roomId}:${userId}:${JSON.stringify(options)}`;
+
+    let total = 0;
+    const cachedTotal = await this.redisService.get(cachedKey);
+    if (cachedTotal) {
+      return {
+        total: Number(JSON.parse(cachedTotal)),
+      };
+    }
+
+    const room = this.roomService.findById(roomId, userId);
+    if (!room) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: '[msg]',
+      });
+    }
+
+    total = (await this.contractsRepository.findByRoom(roomId, {
+      isCounting: true,
+      ...options,
+    })) as number;
+
+    if (total > 0) {
+      this.redisService.set(
+        cachedKey,
+        JSON.stringify(total),
+        this.CACHE_CONTRACT_TTL,
+      );
+    }
+
+    return {
+      total,
+    };
+  }
+
+  async findById(id: string, relations?: string[]) {
+    const cachedKey = `${this.CACHED_KEY.getById}:${id}:${relations ? JSON.stringify(relations) : ''}`;
+
+    const cachedData = await this.redisService.get(cachedKey);
+    if (cachedData) {
+      return JSON.parse(cachedData) as ContractEntity;
+    }
+
+    const queryData = await this.contractsRepository.findById(id, relations);
+    if (queryData) {
+      this.redisService.set(
+        cachedKey,
+        JSON.stringify(queryData),
+        this.CACHE_CONTRACT_TTL,
+      );
+
+      return queryData;
+    }
   }
 
   generateContractData(

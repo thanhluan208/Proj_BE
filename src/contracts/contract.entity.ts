@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { FileEntity } from 'src/files/file.entity';
 import { RoomEntity } from 'src/rooms/room.entity';
 import { StatusEntity } from 'src/statuses/status.entity';
+import { TenantContractEntity } from 'src/tenant-contracts/tenant-contracts.entity';
 import { EntityRelationalHelper } from 'src/utils/relational-entity-helper';
 import {
   Column,
@@ -10,6 +11,7 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
   Unique,
@@ -148,4 +150,10 @@ export class ContractEntity extends EntityRelationalHelper {
   @ApiProperty()
   @DeleteDateColumn()
   deletedAt: Date;
+
+  @OneToMany(
+    () => TenantContractEntity,
+    (tenantContract) => tenantContract.contract,
+  )
+  tenantContracts: TenantContractEntity[];
 }

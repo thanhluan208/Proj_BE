@@ -8,6 +8,7 @@ import { UsersModule } from 'src/users/users.module';
 import { RoomModule } from 'src/rooms/room.module';
 import { FilesModule } from 'src/files/files.module';
 import { TenantModule } from 'src/tenant/tenant.module';
+import { TenantContractsModule } from 'src/tenant-contracts/tenant-contracts.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { TenantModule } from 'src/tenant/tenant.module';
     RoomModule,
     FilesModule,
     TenantModule,
+    TenantContractsModule,
   ],
   controllers: [ContractsController],
   providers: [ContractsService, ContractsRepository],

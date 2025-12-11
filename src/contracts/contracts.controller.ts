@@ -10,7 +10,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiCreatedResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ContractEntity } from './contract.entity';
 import { ContractsService } from './contracts.service';
 import { CreateContractDto } from './dtos/create-contract.dto';
@@ -33,7 +38,7 @@ export class ContractsController {
     return await this.contractsService.create(contractData, request.user);
   }
 
-  @ApiCreatedResponse({
+  @ApiOkResponse({
     type: PaginatedResponseDto<ContractEntity>,
   })
   @Get()
@@ -43,6 +48,27 @@ export class ContractsController {
     @Query() query: GetContractDto,
   ): Promise<PaginatedResponseDto<ContractEntity>> {
     return this.contractsService.findContractsByRoom(
+      query.room,
+      request.user.id,
+      query,
+    );
+  }
+
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        total: { type: 'number' },
+      },
+    },
+  })
+  @Get('paging')
+  @HttpCode(HttpStatus.OK)
+  getTotalByHouse(
+    @Request() request,
+    @Query() query: GetContractDto,
+  ): Promise<{ total: number }> {
+    return this.contractsService.getTotalContractByRoom(
       query.room,
       request.user.id,
       query,

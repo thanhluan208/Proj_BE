@@ -16,13 +16,6 @@ export class ContractsRepository {
     return await this.contractRepository.save(contract);
   }
 
-  async findById(id: string): Promise<ContractEntity | null> {
-    return await this.contractRepository.findOne({
-      where: { id },
-      relations: ['owner', 'tenant', 'room', 'file', 'status'],
-    });
-  }
-
   async findAll(
     options?: FindManyOptions<ContractEntity>,
   ): Promise<ContractEntity[]> {
@@ -40,13 +33,16 @@ export class ContractsRepository {
       skip?: number;
       take?: number;
       status?: string;
+      isCounting?: boolean;
     },
-  ): Promise<ContractEntity[]> {
+  ): Promise<ContractEntity[] | number> {
     const query = this.contractRepository.createQueryBuilder('contract');
 
     query
       .leftJoin('contract.room', 'room')
       .leftJoinAndSelect('contract.status', 'status')
+      .leftJoinAndSelect('contract.tenantContracts', 'tenantContract')
+      .leftJoinAndSelect('tenantContract.tenant', 'tenant')
       .where('room.id = :roomId', { roomId: room_id })
       .andWhere('contract.deletedAt IS NULL');
 
@@ -65,6 +61,10 @@ export class ContractsRepository {
     }
 
     query.orderBy('contract.createdAt', 'DESC');
+
+    if (options?.isCounting) {
+      return await query.getCount();
+    }
 
     return await query.getMany();
   }
@@ -87,6 +87,16 @@ export class ContractsRepository {
     return await this.contractRepository.findOne({
       where,
       relations: ['owner', 'tenant', 'room', 'file', 'status'],
+    });
+  }
+
+  async findById(
+    id: string,
+    relations?: string[],
+  ): Promise<ContractEntity | null> {
+    return await this.contractRepository.findOne({
+      where: { id },
+      ...(relations && { relations }),
     });
   }
 
