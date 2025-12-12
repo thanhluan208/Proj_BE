@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Expose } from 'class-transformer';
+import { IsBoolean } from 'class-validator';
 import { ContractEntity } from 'src/contracts/contract.entity';
 import { HouseEntity } from 'src/houses/house.entity';
 import { StatusEntity } from 'src/statuses/status.entity';
@@ -39,6 +40,10 @@ export class TenantContractEntity extends EntityRelationalHelper {
   @ManyToOne(() => StatusEntity)
   @JoinColumn({ name: 'statusId' })
   status: StatusEntity;
+
+  @ApiProperty({ type: Boolean })
+  @Column({ type: Boolean, nullable: true })
+  isMainTenant?: boolean;
 
   @ApiProperty()
   @CreateDateColumn()

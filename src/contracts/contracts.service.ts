@@ -31,22 +31,22 @@ import { RedisService } from 'src/redis/redis.service';
 import { REDIS_PREFIX_KEY } from 'src/utils/constant';
 import { TenantContractsService } from 'src/tenant-contracts/tenant-contracts.service';
 import { TenantContractEntity } from 'src/tenant-contracts/tenant-contracts.entity';
+import { CreateTenantContractDto } from 'src/tenant-contracts/dto/create-tenant-contract.dto';
+import { createHash, hash } from 'crypto';
 
 @Injectable()
 export class ContractsService {
   private readonly logger = new Logger(RoomsService.name);
   private readonly CACHE_CONTRACT_TTL = 60 * 5; // Cache for 5 minutes
-  private readonly CACHE_ROOM_VERSION_KEY = `${REDIS_PREFIX_KEY.contract}:version`;
+  private readonly CACHE_CONTRACT_VERSION_KEY = `${REDIS_PREFIX_KEY.contract}:version`;
   private readonly CACHED_KEY = {
-    getActiveContractByRoom: 'getActiveContractByRoom',
-    getContractsByRoom: 'getContractsByRoom',
+    findActiveContractByRoom: 'findActiveContractByRoom',
     getTotalContractByRoom: 'getTotalContractByRoom',
-    getById: 'getById',
+    findById: 'findById',
   };
 
   constructor(
     private redisService: RedisService,
-
     private readonly contractsRepository: ContractsRepository,
     private readonly tenantService: TenantService,
     private readonly roomService: RoomsService,
@@ -87,12 +87,16 @@ export class ContractsService {
 
     const createTenantContractQueue: Promise<TenantContractEntity>[] = [];
 
-    tenants.forEach((tent) => {
+    tenants.forEach((tent, index) => {
       createTenantContractQueue.push(
-        this.tenantContractsService.create({
-          contractId: newContract.id,
-          tenantId: tent.id,
-        }),
+        this.tenantContractsService.create(
+          {
+            contractId: newContract.id,
+            tenantId: tent.id,
+            isMainTenant: index === 0,
+          },
+          userJwtPayload.id,
+        ),
       );
     });
 
@@ -103,12 +107,109 @@ export class ContractsService {
     };
   }
 
+  async delete(id: string, userJwtPayload: JwtPayloadType) {
+    const contract = await this.findById(id, userJwtPayload.id, [
+      'room',
+      'room.house',
+      'room.house.owner',
+    ]);
+
+    if (!contract) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Contract not found',
+      });
+    }
+
+    if (contract.room.house.owner.id !== userJwtPayload.id) {
+      throw new BadRequestException({
+        status: HttpStatus.FORBIDDEN,
+      });
+    }
+
+    await this.tenantContractsService.removeByContract(contract.id);
+
+    await this.contractsRepository.softDelete(id);
+
+    await this.redisService.incr(
+      `${this.CACHE_CONTRACT_VERSION_KEY}:${userJwtPayload.id}`,
+    );
+
+    return contract;
+  }
+
+  async updateMainTenantContract(
+    payload: CreateTenantContractDto,
+    userJwtPayload: JwtPayloadType,
+  ) {
+    const { contractId, tenantId } = payload;
+
+    const contract = await this.findById(contractId, userJwtPayload.id, [
+      'room',
+      'room.house',
+      'room.house.owner',
+    ]);
+    if (!contract) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'No contract found',
+      });
+    }
+    const tenant = await this.tenantService.findById(tenantId, [
+      'room',
+      'room.house',
+      'room.house.owner',
+    ]);
+    if (!tenant) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'No tenant found',
+      });
+    }
+
+    if (
+      contract.room.house.owner.id !== userJwtPayload.id ||
+      tenant.room.house.owner.id !== userJwtPayload.id
+    ) {
+      throw new BadRequestException({
+        status: HttpStatus.FORBIDDEN,
+      });
+    }
+
+    const updated = await this.tenantContractsService.updateMainTenant(
+      {
+        contractId,
+        tenantId,
+      },
+      userJwtPayload.id,
+    );
+
+    if (!updated) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Update failed',
+      });
+    }
+
+    return updated;
+  }
+
   async getActiveContractByRoom(
     roomId: string,
     userId: string,
     relations?: string[],
   ) {
-    const cachedKey = `${this.CACHED_KEY.getActiveContractByRoom}:${roomId}`;
+    const cacheVersion =
+      (await this.redisService.get(
+        `${this.CACHE_CONTRACT_VERSION_KEY}:${userId}`,
+      )) ?? '0';
+
+    const sortedRelations = (relations || [])?.sort().join(',');
+    const hashRelations = createHash('sha256')
+      .update(sortedRelations)
+      .digest('hex');
+
+    const cachedKey = `${this.CACHED_KEY.findActiveContractByRoom}:${roomId}:${hashRelations}:${cacheVersion}`;
 
     const room = this.roomService.findById(roomId, userId);
     if (!room) {
@@ -153,7 +254,7 @@ export class ContractsService {
   ) {
     const cacheVersion =
       (await this.redisService.get(
-        `${this.CACHE_ROOM_VERSION_KEY}:${roomId}`,
+        `${this.CACHE_CONTRACT_VERSION_KEY}:${userId}`,
       )) ?? '0';
 
     const room = this.roomService.findById(roomId, userId);
@@ -168,7 +269,17 @@ export class ContractsService {
     const pageSize = options.pageSize || 10;
     const skip = (page - 1) * pageSize;
 
-    const cacheKey = `${REDIS_PREFIX_KEY.room}:${roomId}:${JSON.stringify(options)}:v${cacheVersion}`;
+    const hashKey = createHash('sha256')
+      .update(
+        JSON.stringify({
+          ...options,
+          roomId,
+          userId,
+        }),
+      )
+      .digest('hex');
+
+    const cacheKey = `${REDIS_PREFIX_KEY.room}:${hashKey}:v${cacheVersion}`;
 
     let contracts: ContractEntity[] = [];
 
@@ -206,7 +317,22 @@ export class ContractsService {
       status?: string;
     },
   ) {
-    const cachedKey = `${this.CACHED_KEY.getTotalContractByRoom}:${roomId}:${userId}:${JSON.stringify(options)}`;
+    const cacheVersion =
+      (await this.redisService.get(
+        `${this.CACHE_CONTRACT_VERSION_KEY}:${userId}`,
+      )) ?? '0';
+
+    const hashKey = createHash('sha256')
+      .update(
+        JSON.stringify({
+          ...options,
+          roomId,
+          userId,
+        }),
+      )
+      .digest('hex');
+
+    const cachedKey = `${this.CACHED_KEY.getTotalContractByRoom}:${hashKey}:${cacheVersion}`;
 
     let total = 0;
     const cachedTotal = await this.redisService.get(cachedKey);
@@ -242,8 +368,18 @@ export class ContractsService {
     };
   }
 
-  async findById(id: string, relations?: string[]) {
-    const cachedKey = `${this.CACHED_KEY.getById}:${id}:${relations ? JSON.stringify(relations) : ''}`;
+  async findById(id: string, userId: string, relations?: string[]) {
+    const cacheVersion =
+      (await this.redisService.get(
+        `${this.CACHE_CONTRACT_VERSION_KEY}:${userId}`,
+      )) ?? '0';
+
+    const sortedRelations = (relations || [])?.sort().join(',');
+    const hashRelations = createHash('sha256')
+      .update(sortedRelations)
+      .digest('hex');
+
+    const cachedKey = `${this.CACHED_KEY.findById}:${id}:${hashRelations}:${cacheVersion}`;
 
     const cachedData = await this.redisService.get(cachedKey);
     if (cachedData) {

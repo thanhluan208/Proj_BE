@@ -44,6 +44,17 @@ export class TenantContractsRepository {
     });
   }
 
+  async findTenantContractIsMainTenant(contractId: string) {
+    return await this.repo.findOne({
+      where: {
+        contract: { id: contractId },
+        isMainTenant: true,
+        deletedAt: IsNull(),
+        status: { id: StatusEnum.active },
+      },
+    });
+  }
+
   async remove(id: string) {
     await this.repo.softDelete(id);
   }

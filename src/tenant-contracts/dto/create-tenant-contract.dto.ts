@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateTenantContractDto {
   @ApiProperty({
@@ -19,4 +25,13 @@ export class CreateTenantContractDto {
   @IsNotEmpty()
   @IsString()
   tenantId: string;
+
+  @ApiProperty({
+    type: Boolean,
+    description: 'Is Main Tenant',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isMainTenant?: boolean;
 }
