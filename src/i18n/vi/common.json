@@ -1,0 +1,7 @@
+{
+  "resetPassword": "Đặt lại mật khẩu",
+  "confirmEmail": "Xác nhận Email mới",
+  "errors": {
+    "NOT_FOUND": "Không tìm thấy"
+  }
+}

@@ -29,6 +29,7 @@ import { TenantEntity } from 'src/tenant/tenant.entity';
 import { IsNull, Repository } from 'typeorm';
 import { BillingEntity } from 'src/billing/billing.entity';
 import { RoomExpenseEntity } from 'src/room-expenses/room-expense.entity';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class RoomsService {
@@ -83,7 +84,6 @@ export class RoomsService {
 
     // Create folder for room
     await this.filesService.createFolder(`${house.id}/${room.id}`);
-
     await this.redisService.incr(
       `${this.CACHE_ROOM_VERSION_KEY}:${currentUser.id}:${house.id}`,
     );
@@ -130,7 +130,6 @@ export class RoomsService {
       ...updatedRoom,
     });
 
-    await this.redisService.del(`${REDIS_PREFIX_KEY.room}:${id}`);
     await this.redisService.incr(
       `${this.CACHE_ROOM_VERSION_KEY}:${userId}:${room.house.id}`,
     );
@@ -138,10 +137,23 @@ export class RoomsService {
     return result;
   }
 
-  async findById(id: string, userId: string): Promise<RoomEntity> {
+  async findById(
+    id: string,
+    userId: string,
+    relations?: string[],
+  ): Promise<RoomEntity> {
     this.logger.log(`Finding room with ID: ${id}`);
+    const cacheVersion =
+      (await this.redisService.get(
+        `${this.CACHE_ROOM_VERSION_KEY}:${userId}`,
+      )) ?? '0';
 
-    const cacheKey = `${REDIS_PREFIX_KEY.room}:${id}`;
+    const sortRelations = (relations || []).sort().join(',');
+    const hashRelations = createHash('sha256')
+      .update(sortRelations)
+      .digest('hex');
+
+    const cacheKey = `${REDIS_PREFIX_KEY.room}:${id}:${hashRelations}:${cacheVersion}`;
 
     let room: RoomEntity | null = null;
 
@@ -151,7 +163,7 @@ export class RoomsService {
       room = JSON.parse(cachedRoom);
     } else {
       this.logger.log(`Room not found in cache for ID: ${id}`);
-      room = await this.roomsRepository.findByIdAndOwner(id, userId);
+      room = await this.roomsRepository.findByIdAndOwner(id, userId, relations);
       if (room) {
         await this.redisService.set(
           cacheKey,

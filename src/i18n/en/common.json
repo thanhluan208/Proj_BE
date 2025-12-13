@@ -1,0 +1,7 @@
+{
+  "resetPassword": "Reset Password",
+  "confirmEmail": "Confirm New Email",
+  "errors": {
+    "NOT_FOUND": "Not Found"
+  }
+}

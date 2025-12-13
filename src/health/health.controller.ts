@@ -1,13 +1,26 @@
 import { Controller, Get } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { I18nContext, I18nService } from 'nestjs-i18n';
 
 @Controller('health')
 export class HealthController {
   constructor(
     @InjectDataSource()
     private readonly dataSource: DataSource,
+    private readonly i18n: I18nService,
   ) {}
+
+  @Get('i18n')
+  async checkI18n() {
+    const text = this.i18n.t('auth.title', {
+      lang: I18nContext.current()?.lang,
+    });
+    return {
+      message: text,
+      lang: I18nContext.current()?.lang,
+    };
+  }
 
   @Get()
   async checkHealth() {

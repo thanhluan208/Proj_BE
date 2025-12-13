@@ -8,6 +8,7 @@ import { TenantContractEntity } from './tenant-contracts.entity';
 import { TenantContractsRepository } from './tenant-contracts.repository';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_PREFIX_KEY } from 'src/utils/constant';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class TenantContractsService {
@@ -17,6 +18,7 @@ export class TenantContractsService {
     findByActiveTenant: 'findByActiveTenant',
     findCurrentMainTenantContract: 'findCurrentMainTenantContract',
     findTenantContractByTenant: 'findTenantContractByTenant',
+    findByMainContract: 'findByMainContract',
   };
 
   constructor(
@@ -156,6 +158,44 @@ export class TenantContractsService {
     await Promise.all(removeQueue);
 
     return tenantContracts;
+  }
+
+  async findByMainContract(
+    contractId: string,
+    userId: string,
+    relations?: string[],
+  ) {
+    const cacheVersion =
+      (await this.redisService.get(
+        `${this.CACHE_TENANT_CONTRACT_VERSION_KEY}:${userId}`,
+      )) ?? '0';
+
+    const sortRelations = (relations || []).sort().join(',');
+    const hashRelations = createHash('sha256')
+      .update(sortRelations)
+      .digest('hex');
+
+    const cachedKey = `${this.CACHED_KEY.findByMainContract}:${userId}:${hashRelations}:${cacheVersion}`;
+
+    const dataCached = await this.redisService.get(cachedKey);
+    if (dataCached) {
+      return JSON.parse(dataCached) as TenantContractEntity;
+    }
+
+    const contract = await this.tenantContractRepository.findByMainContract(
+      contractId,
+      relations || [],
+    );
+
+    if (contract) {
+      this.redisService.set(
+        cachedKey,
+        JSON.stringify(contract),
+        this.CACHE_TENANT_CONTRACT_TTL,
+      );
+    }
+
+    return contract;
   }
 
   async delete(id: string) {

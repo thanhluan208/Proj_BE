@@ -34,6 +34,17 @@ export class TenantContractsRepository {
     });
   }
 
+  async findByMainContract(contractId: string, relations: string[]) {
+    return await this.repo.findOne({
+      where: {
+        contract: { id: contractId },
+        deletedAt: IsNull(),
+        isMainTenant: true,
+      },
+      relations,
+    });
+  }
+
   async findByActiveTenant(tenantId: string) {
     return await this.repo.findOne({
       where: {

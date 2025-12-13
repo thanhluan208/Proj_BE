@@ -1,0 +1,8 @@
+{
+  "errors": {
+    "invalidUsers": "Một hoặc nhiều người dùng không hợp lệ hoặc không tìm thấy",
+    "projectNotFound": "Không tìm thấy dự án",
+    "userAlreadyInProject": "Một hoặc nhiều người dùng đã là thành viên của dự án này",
+    "insufficientPermissions": "Bạn không có đủ quyền để thêm thành viên vào dự án này"
+  }
+}

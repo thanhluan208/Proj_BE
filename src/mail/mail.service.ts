@@ -1,12 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { I18nContext } from 'nestjs-i18n';
+import { I18nContext, I18nService } from 'nestjs-i18n';
 
 import { MailerService } from '../mailer/mailer.service';
 import path from 'path';
 import { AllConfigType } from '../config/config.type';
 import { MailData } from './mail.type';
-import { MaybeType } from 'src/utils/types/maybe.type';
 
 @Injectable()
 export class MailService {
@@ -14,6 +13,7 @@ export class MailService {
   constructor(
     private readonly mailerService: MailerService,
     private readonly configService: ConfigService<AllConfigType>,
+    private readonly i18n: I18nService,
   ) {}
 
   /**
@@ -25,22 +25,22 @@ export class MailService {
     mailData: MailData<{ hash: string; otpCode: string }>,
   ): Promise<void> {
     this.logger.log(`userSignUp called for: ${mailData.to}`);
-    const i18n = I18nContext.current();
-    let title: MaybeType<string>;
-    let text1: MaybeType<string>;
-    let text2: MaybeType<string>;
-    let text3: MaybeType<string>;
-    let actionTitle: MaybeType<string>;
 
-    if (i18n) {
-      [title, text1, text2, text3, actionTitle] = await Promise.all([
-        i18n.t('auth.title'),
-        i18n.t('auth.text1'),
-        i18n.t('auth.text2'),
-        i18n.t('auth.text3'),
-        i18n.t('auth.actionTitle'),
-      ]);
-    }
+    const title = this.i18n.t('auth.title', {
+      lang: I18nContext.current()?.lang,
+    });
+    const text1 = this.i18n.t('auth.text1', {
+      lang: I18nContext.current()?.lang,
+    });
+    const text2 = this.i18n.t('auth.text2', {
+      lang: I18nContext.current()?.lang,
+    });
+    const text3 = this.i18n.t('auth.text3', {
+      lang: I18nContext.current()?.lang,
+    });
+    const actionTitle = this.i18n.t('auth.actionTitle', {
+      lang: I18nContext.current()?.lang,
+    });
 
     // Construct URL for email confirmation page
     const url = new URL(
@@ -72,7 +72,8 @@ export class MailService {
         title,
         url: url.toString(),
         actionTitle,
-        app_name: this.configService.get('app.name', { infer: true }),
+        app_name:
+          this.configService.get('app.name', { infer: true }) ?? 'App Name',
         text1,
         text2,
         text3,
@@ -90,32 +91,22 @@ export class MailService {
    */
   async resendOtp(mailData: MailData<{ otpCode: string }>): Promise<void> {
     this.logger.log(`resendOtp called for: ${mailData.to}`);
-    const i18n = I18nContext.current();
-    let title: MaybeType<string>;
-    let text1: MaybeType<string>;
-    let text2: MaybeType<string>;
-    let text3: MaybeType<string>;
-    let actionTitle: MaybeType<string>;
 
-    if (i18n) {
-      [title, text1, text2, text3, actionTitle] = await Promise.all([
-        i18n.t('otp.resendTitle'),
-        i18n.t('otp.resendText1'),
-        i18n.t('otp.resendText2'),
-        i18n.t('otp.resendText3'),
-        i18n.t('otp.actionTitle'),
-      ]);
-    }
-
-    // Fallback values if i18n is not available
-    const emailTitle = title || 'Your New Verification Code';
-    const emailText1 = text1 || 'You requested a new verification code.';
-    const emailText2 =
-      text2 || 'Please use the code below to verify your email address:';
-    const emailText3 =
-      text3 ||
-      'If you continue to have trouble, please contact our support team.';
-    const emailActionTitle = actionTitle || 'Verify Email';
+    const emailTitle = this.i18n.t('otp.resendTitle', {
+      lang: I18nContext.current()?.lang,
+    });
+    const emailText1 = this.i18n.t('otp.resendText1', {
+      lang: I18nContext.current()?.lang,
+    });
+    const emailText2 = this.i18n.t('otp.resendText2', {
+      lang: I18nContext.current()?.lang,
+    });
+    const emailText3 = this.i18n.t('otp.resendText3', {
+      lang: I18nContext.current()?.lang,
+    });
+    const emailActionTitle = this.i18n.t('otp.actionTitle', {
+      lang: I18nContext.current()?.lang,
+    });
 
     // Construct URL for email confirmation page
     const url = new URL(
@@ -146,7 +137,8 @@ export class MailService {
         title: emailTitle,
         url: url.toString(),
         actionTitle: emailActionTitle,
-        app_name: this.configService.get('app.name', { infer: true }),
+        app_name:
+          this.configService.get('app.name', { infer: true }) ?? 'App Name',
         text1: emailText1,
         text2: emailText2,
         text3: emailText3,
@@ -161,22 +153,22 @@ export class MailService {
     mailData: MailData<{ hash: string; tokenExpires: number }>,
   ): Promise<void> {
     this.logger.log(`forgotPassword called for: ${mailData.to}`);
-    const i18n = I18nContext.current();
-    let resetPasswordTitle: MaybeType<string>;
-    let text1: MaybeType<string>;
-    let text2: MaybeType<string>;
-    let text3: MaybeType<string>;
-    let text4: MaybeType<string>;
 
-    if (i18n) {
-      [resetPasswordTitle, text1, text2, text3, text4] = await Promise.all([
-        i18n.t('common.resetPassword'),
-        i18n.t('reset-password.text1'),
-        i18n.t('reset-password.text2'),
-        i18n.t('reset-password.text3'),
-        i18n.t('reset-password.text4'),
-      ]);
-    }
+    const resetPasswordTitle = this.i18n.t('common.resetPassword', {
+      lang: I18nContext.current()?.lang,
+    });
+    const text1 = this.i18n.t('reset-password.text1', {
+      lang: I18nContext.current()?.lang,
+    });
+    const text2 = this.i18n.t('reset-password.text2', {
+      lang: I18nContext.current()?.lang,
+    });
+    const text3 = this.i18n.t('reset-password.text3', {
+      lang: I18nContext.current()?.lang,
+    });
+    const text4 = this.i18n.t('reset-password.text4', {
+      lang: I18nContext.current()?.lang,
+    });
 
     const url = new URL(
       this.configService.getOrThrow('app.frontendDomain', {
@@ -206,9 +198,10 @@ export class MailService {
         title: resetPasswordTitle,
         url: url.toString(),
         actionTitle: resetPasswordTitle,
-        app_name: this.configService.get('app.name', {
-          infer: true,
-        }),
+        app_name:
+          this.configService.get('app.name', {
+            infer: true,
+          }) ?? 'App Name',
         text1,
         text2,
         text3,
@@ -220,20 +213,19 @@ export class MailService {
 
   async confirmNewEmail(mailData: MailData<{ hash: string }>): Promise<void> {
     this.logger.log(`confirmNewEmail called for: ${mailData.to}`);
-    const i18n = I18nContext.current();
-    let emailConfirmTitle: MaybeType<string>;
-    let text1: MaybeType<string>;
-    let text2: MaybeType<string>;
-    let text3: MaybeType<string>;
 
-    if (i18n) {
-      [emailConfirmTitle, text1, text2, text3] = await Promise.all([
-        i18n.t('common.confirmEmail'),
-        i18n.t('confirm-new-email.text1'),
-        i18n.t('confirm-new-email.text2'),
-        i18n.t('confirm-new-email.text3'),
-      ]);
-    }
+    const emailConfirmTitle = this.i18n.t('common.confirmEmail', {
+      lang: I18nContext.current()?.lang,
+    });
+    const text1 = this.i18n.t('confirm-new-email.text1', {
+      lang: I18nContext.current()?.lang,
+    });
+    const text2 = this.i18n.t('confirm-new-email.text2', {
+      lang: I18nContext.current()?.lang,
+    });
+    const text3 = this.i18n.t('confirm-new-email.text3', {
+      lang: I18nContext.current()?.lang,
+    });
 
     const url = new URL(
       this.configService.getOrThrow('app.frontendDomain', {
@@ -262,7 +254,8 @@ export class MailService {
         title: emailConfirmTitle,
         url: url.toString(),
         actionTitle: emailConfirmTitle,
-        app_name: this.configService.get('app.name', { infer: true }),
+        app_name:
+          this.configService.get('app.name', { infer: true }) ?? 'App Name',
         text1,
         text2,
         text3,

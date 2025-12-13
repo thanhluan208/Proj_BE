@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, In } from 'typeorm';
 import { StatusEnum } from 'src/statuses/statuses.enum';
 import { RoomEntity } from './room.entity';
+import { applyRelations } from 'src/utils/query-builder';
 
 @Injectable()
 export class RoomRepository {
@@ -26,11 +27,22 @@ export class RoomRepository {
   async findByIdAndOwner(
     id: string,
     owner_id: string,
+    relations: string[] = [],
   ): Promise<RoomEntity | null> {
-    return await this.roomRepository.findOne({
-      where: { id, house: { owner: { id: owner_id } } },
-      relations: ['house'],
+    const query = this.roomRepository
+      .createQueryBuilder('room')
+      .leftJoinAndSelect('room.house', 'house')
+      .leftJoinAndSelect('house.owner', 'owner')
+      .where('room.id = :id', { id })
+      .andWhere('owner.id = :owner_id', { owner_id });
+
+    applyRelations(query, relations, {
+      rootAlias: 'room',
+      allowedRelations: ['contracts', 'contracts.status', 'status'],
+      select: true, // change to false if you only need joins for filtering
     });
+
+    return await query.getOne();
   }
 
   async findByIds(ids: string[]): Promise<RoomEntity[]> {

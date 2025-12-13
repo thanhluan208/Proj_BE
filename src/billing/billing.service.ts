@@ -13,59 +13,77 @@ import { BillingRepository } from './billing.repository';
 import { CreateBillingDto } from './dto/create-billing.dto';
 import { ContractsService } from 'src/contracts/contracts.service';
 import { RoomEntity } from 'src/rooms/room.entity';
+import { TenantContractsService } from 'src/tenant-contracts/tenant-contracts.service';
+import { StatusEnum } from 'src/statuses/statuses.enum';
+
+import * as ExcelJS from 'exceljs';
+import * as path from 'path';
+import * as fs from 'fs/promises';
+import { I18nContext, I18nService } from 'nestjs-i18n';
+import { generateBillingExcel, UltilityDetail } from './billing.util';
+import { FilesService } from 'src/files/files.service';
+import dayjs from 'dayjs';
 
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
   private readonly CACHE_BILLING_TTL = 60 * 5; // 5 minutes
+  private readonly outputDir: string;
 
   constructor(
     private readonly repository: BillingRepository,
-    private readonly contractService: ContractsService,
-    private readonly tenantService: TenantService,
+    private readonly roomService: RoomsService,
+    private readonly tenantContractService: TenantContractsService,
     private readonly redisService: RedisService,
-  ) {}
+    private readonly i18nService: I18nService,
+    private readonly fileService: FilesService,
+  ) {
+    this.outputDir = path.join(process.cwd(), 'generated-invoices');
+  }
 
   async create(dto: CreateBillingDto, user: JwtPayloadType) {
-    // 1. Fetch Tenant
-    const tenant = await this.tenantService.findById(dto.tenantId, ['room']);
-    if (!tenant) {
+    const { roomId } = dto;
+    const lang = I18nContext.current()?.lang;
+
+    const room = await this.roomService.findById(roomId, user.id, [
+      'contracts',
+      'contracts.status',
+    ]);
+    if (!room) {
       throw new BadRequestException({
         status: HttpStatus.BAD_REQUEST,
-        errors: {
-          tenant: 'tenantNotFound',
-        },
+        message: 'Room not found',
       });
     }
 
-    if (tenant.room.id !== dto.roomId) {
-      throw new BadRequestException({
-        status: HttpStatus.BAD_REQUEST,
-        message: '[msg]',
-      });
-    }
+    console.log('[ROOM:]', room);
 
-    // 2. Verify Ownership via Room
-    const contract = await this.contractService.getActiveContractByRoom(
-      dto.roomId,
-      user.id,
-      ['room', 'room.house', 'room.house.owner'],
+    const activeContract = room.contracts.find(
+      (elm) => elm.status?.id === StatusEnum.active,
     );
-    if (!contract) {
+
+    if (!activeContract) {
       throw new BadRequestException({
         status: HttpStatus.BAD_REQUEST,
-        errors: {
-          room: 'accessDeniedOrRoomNotFound',
-        },
+        message: 'No active contract ',
       });
     }
 
-    if (contract.room.house.owner.id !== user.id) {
+    const currentTenantContract =
+      await this.tenantContractService.findByMainContract(
+        activeContract?.id,
+        user.id,
+        ['contract', 'tenant'],
+      );
+
+    if (!currentTenantContract) {
       throw new BadRequestException({
         status: HttpStatus.BAD_REQUEST,
-        message: '[msg]',
+        message: 'No active contract ',
       });
     }
+
+    const { contract, tenant } = currentTenantContract;
 
     // 3. Calculate Costs
     const electricityUsage =
@@ -95,96 +113,183 @@ export class BillingService {
       Number(contract.base_rent) +
       totalElectricityCost +
       totalWaterCost +
+      Number(contract.internet_fee) +
       Number(contract.living_fee) +
       Number(contract.parking_fee) +
       Number(contract.cleaning_fee);
 
-    // 4. Save Billing
+    let utilityDetails: UltilityDetail | null = null;
+
+    if (Number(contract.price_per_electricity_unit) > 0) {
+      utilityDetails = {
+        electric_end_index: dto.electricity_end_index,
+        electric_price_unit: contract.price_per_electricity_unit,
+        electric_start_index: dto.electricity_start_index,
+      };
+    }
+
+    if (Number(contract.price_per_water_unit) > 0) {
+      const waterUltility = {
+        water_start_index: dto.water_start_index,
+        water_end_index: dto.water_end_index,
+        water_price_unit: contract.price_per_water_unit,
+      };
+      utilityDetails = {
+        ...utilityDetails,
+        ...waterUltility,
+      };
+    }
+
+    const billingItems = [
+      {
+        description: this.i18nService.t('billing.monthlyRent', { lang }),
+        quantity: 1,
+        unitPrice: contract.base_rent,
+        amount: contract.base_rent,
+      },
+      {
+        description: this.i18nService.t('billing.electricity', { lang }),
+        quantity: Number(contract.fixed_electricity_fee) ? 1 : electricityUsage,
+        unitPrice: Number(contract.fixed_electricity_fee)
+          ? contract.fixed_electricity_fee
+          : contract.price_per_electricity_unit,
+        amount: totalElectricityCost,
+      },
+      {
+        description: this.i18nService.t('billing.water', { lang }),
+        quantity: Number(contract.fixed_water_fee) ? 1 : waterUsage,
+        unitPrice: Number(contract.fixed_water_fee)
+          ? contract.fixed_water_fee
+          : contract.price_per_water_unit,
+        amount: totalWaterCost,
+      },
+    ];
+
+    if (contract.internet_fee) {
+      billingItems.push({
+        description: this.i18nService.t('billing.internetFee', { lang }),
+        quantity: 1,
+        unitPrice: contract.internet_fee,
+        amount: contract.internet_fee,
+      });
+    }
+
+    if (contract.cleaning_fee) {
+      billingItems.push({
+        description: this.i18nService.t('billing.cleaningFee', { lang }),
+        quantity: 1,
+        unitPrice: contract.cleaning_fee,
+        amount: contract.cleaning_fee,
+      });
+    }
+
+    if (contract.living_fee) {
+      billingItems.push({
+        description: this.i18nService.t('billing.livingFee', { lang }),
+        quantity: 1,
+        unitPrice: contract.living_fee,
+        amount: contract.living_fee,
+      });
+    }
+
+    if (contract.parking_fee) {
+      billingItems.push({
+        description: this.i18nService.t('billing.parkingFee', { lang }),
+        quantity: 1,
+        unitPrice: contract.parking_fee,
+        amount: contract.parking_fee,
+      });
+    }
+
+    // if (contract.overRentalFee) {
+    //   billingItems.push({
+    //     description: this.i18nService.t('billing.overRentalFee', { lang }),
+    //     quantity: 1,
+    //     unitPrice: Number(contract.overRentalFee),
+    //     amount: Number(contract.overRentalFee),
+    //   });
+    // }
+
+    const houseInfo: CreateBillingDto['houseInfo'] = {
+      ...dto.houseInfo,
+      houseAddress: room.house.address,
+      houseOwner: room.house.owner.bankName,
+      houseOwnerPhoneNumber: room.house.owner.phoneNumber,
+    };
+
+    const bankInfo: CreateBillingDto['bankInfo'] = {
+      ...dto.bankInfo,
+      bankAccountName: room.house.owner.bankAccountName,
+      bankAccountNumber: room.house.owner.bankAccountNumber,
+      bankName: room.house.owner.bankName,
+    };
+
+    // return result;
+    await this.ensureOutputDirectory();
+
+    const buffer = await generateBillingExcel(
+      {
+        room,
+        contract,
+        tenant,
+        bankInfo: bankInfo,
+        houseInfo: houseInfo,
+        from: dto.from,
+        to: dto.to,
+        notes: dto.notes,
+        utilityDetails,
+        items: billingItems,
+        totalAmount: totalAmount,
+      },
+      this.i18nService,
+    );
+    const fileName = `invoice-${room.name}-${Date.now()}.xlsx`;
+    const filePath = `${user.id}/${room.house.id}/${room.id}/billing/${dayjs().format('MM-YYYY')}/${fileName}`;
+
+    const file = await this.fileService.uploadBufferWithCustomPath(
+      buffer,
+      filePath,
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      fileName,
+      user.id,
+    );
+
     const result = await this.repository.create({
-      ...dto,
-      tenant,
       room: {
         id: dto.roomId,
       } as RoomEntity,
-      total_electricity_cost: totalElectricityCost,
-      total_water_cost: totalWaterCost,
-      total_living_cost: contract.living_fee,
-      total_parking_cost: contract.parking_fee,
-      total_cleaning_cost: contract.cleaning_fee,
-      base_rent: contract.base_rent,
       total_amount: totalAmount,
       status: BillingStatusEnum.PENDING_TENANT_PAYMENT,
+      tenantContract: currentTenantContract,
+      from: dto.from,
+      to: dto.to,
+      file: file,
+      water_end_index: dto.water_end_index,
+      water_start_index: dto.water_start_index,
+      electricity_end_index: dto.electricity_end_index,
+      electricity_start_index: dto.electricity_start_index,
     });
 
     return result;
   }
 
-  // async findByTenant(tenantId: string, user: JwtPayloadType) {
-  //   // Verify access (owner of the room the tenant belongs to)
-  //   const tenant = await this.tenantService.findById(tenantId);
-  //   if (!tenant) {
-  //     throw new BadRequestException('Tenant not found');
-  //   }
-  //   const room = await this.roomsService.findById(tenant.room.id, user.id);
-  //   if (!room) {
-  //     throw new BadRequestException('Access denied');
-  //   }
+  private async ensureOutputDirectory(): Promise<void> {
+    try {
+      await fs.access(this.outputDir);
+    } catch {
+      await fs.mkdir(this.outputDir, { recursive: true });
+    }
+  }
 
-  //   const cacheKey = `billing:tenant:${tenantId}`;
-  //   const cachedData = await this.redisService.get(cacheKey);
-  //   if (cachedData) {
-  //     return JSON.parse(cachedData);
-  //   }
+  async saveToFile(data: any, filename?: string): Promise<string> {
+    await this.ensureOutputDirectory();
 
-  //   const data = await this.repository.findByTenant(tenantId);
-  //   await this.redisService.set(
-  //     cacheKey,
-  //     JSON.stringify(data),
-  //     this.CACHE_BILLING_TTL,
-  //   );
-  //   return data;
-  // }
+    const buffer = await generateBillingExcel(data, this.i18nService);
+    const fileName =
+      filename || `invoice-${data.invoiceNumber}-${Date.now()}.xlsx`;
+    const filePath = path.join(this.outputDir, fileName);
 
-  // async findByRoom(roomId: string, user: JwtPayloadType) {
-  //   const room = await this.roomsService.findById(roomId, user.id);
-  //   if (!room) {
-  //     throw new BadRequestException('Access denied');
-  //   }
-  //   const cacheKey = `billing:room:${roomId}`;
-  //   const cachedData = await this.redisService.get(cacheKey);
-  //   if (cachedData) {
-  //     return JSON.parse(cachedData);
-  //   }
-
-  //   const data = await this.repository.findByRoom(roomId);
-  //   await this.redisService.set(
-  //     cacheKey,
-  //     JSON.stringify(data),
-  //     this.CACHE_BILLING_TTL,
-  //   );
-  //   return data;
-  // }
-
-  // async markAsPaid(id: string, user: JwtPayloadType) {
-  //   const billing = await this.repository.findById(id);
-  //   if (!billing) {
-  //     throw new BadRequestException('Billing not found');
-  //   }
-
-  //   // Verify ownership
-  //   const room = await this.roomsService.findById(billing.room.id, user.id);
-  //   if (!room) {
-  //     throw new BadRequestException('Access denied');
-  //   }
-
-  //   const result = await this.repository.update(id, {
-  //     status: BillingStatusEnum.PAID,
-  //     payment_date: new Date(),
-  //   });
-
-  //   await this.redisService.del(`billing:tenant:${billing.tenant.id}`);
-  //   await this.redisService.del(`billing:room:${room.id}`);
-
-  //   return result;
-  // }
+    await fs.writeFile(filePath, buffer);
+    return filePath;
+  }
 }

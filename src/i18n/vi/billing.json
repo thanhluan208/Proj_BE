@@ -1,0 +1,62 @@
+{
+  "invoiceTitle": "HÓA ĐƠN THUÊ NHÀ",
+  "fromLandlord": "TỪ: THÔNG TIN CHỦ NHÀ",
+  "invoiceDetails": "CHI TIẾT HÓA ĐƠN",
+  "billToTenant": "NGƯỜI THANH TOÁN: THÔNG TIN NGƯỜI THUÊ",
+  "monthlyRent": "Tiền thuê hàng tháng",
+  "electricity": "Tiền điện",
+  "water": "Tiền nước",
+  "internetFee": "Phí Internet",
+  "cleaningFee": "Phí dọn dẹp",
+  "livingFee": "Phí sinh hoạt",
+  "parkingFee": "Phí gửi xe",
+  "overRentalFee": "Phí thuê quá người",
+  "table": {
+    "no": "STT",
+    "description": "Nội dung",
+    "quantity": "Số lượng",
+    "unitPrice": "Đơn giá",
+    "amount": "Thành tiền"
+  },
+  "utility": {
+    "title": "CHI TIẾT CHỈ SỐ ĐIỆN NƯỚC",
+    "index": "STT",
+    "content": "Loại",
+    "clockIndex": "Chỉ số công tơ",
+    "usageAmount": "Số lượng sử dụng",
+    "pricePerUnit": "Đơn giá",
+    "total": "Tổng cộng",
+    "electric": "Điện",
+    "water": "Nước",
+    "start": "Đầu kỳ",
+    "end": "Cuối kỳ"
+  },
+  "summary": {
+    "subtotal": "Tạm tính:",
+    "previousBalance": "Số dư kỳ trước:",
+    "totalAmountDue": "TỔNG SỐ TIỀN PHẢI THANH TOÁN:"
+  },
+  "notes": "Ghi chú:",
+  "footer": {
+    "thankYou": "Cảm ơn quý khách đã thanh toán!",
+    "paymentReminder": "Vui lòng thanh toán trước hạn để tránh phát sinh phí trễ hạn."
+  },
+  "landlord": {
+    "name": "Tên",
+    "address": "Địa chỉ",
+    "phone": "Số điện thoại",
+    "bankAccount": "Tài khoản ngân hàng"
+  },
+  "details": {
+    "invoiceNo": "Số hóa đơn",
+    "invoiceDate": "Ngày lập hóa đơn",
+    "dueDate": "Hạn thanh toán",
+    "billingPeriod": "Kỳ thanh toán"
+  },
+  "tenant": {
+    "name": "Tên người thuê",
+    "roomNumber": "Số phòng",
+    "phone": "Số điện thoại",
+    "idNumber": "Số CMND/CCCD"
+  }
+}

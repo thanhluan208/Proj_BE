@@ -1,0 +1,62 @@
+{
+  "invoiceTitle": "RENTAL INVOICE",
+  "fromLandlord": "FROM: LANDLORD INFORMATION",
+  "invoiceDetails": "INVOICE DETAILS",
+  "billToTenant": "BILL TO: TENANT INFORMATION",
+  "monthlyRent": "Monthly Rent",
+  "electricity": "Electricity",
+  "water": "Water",
+  "internetFee": "Internet Fee",
+  "cleaningFee": "Cleaning Fee",
+  "livingFee": "Living Fee",
+  "parkingFee": "Parking Fee",
+  "overRentalFee": "Over Rental Fee",
+  "table": {
+    "no": "No",
+    "description": "Description",
+    "quantity": "Quantity",
+    "unitPrice": "Unit Price",
+    "amount": "Amount"
+  },
+  "utility": {
+    "title": "UTILITY METER READINGS DETAIL",
+    "index": "Index",
+    "content": "Content",
+    "clockIndex": "Clock Index",
+    "usageAmount": "Usage Amount",
+    "pricePerUnit": "Price per Unit",
+    "total": "Total",
+    "electric": "Electric",
+    "water": "Water",
+    "start": "Start",
+    "end": "End"
+  },
+  "summary": {
+    "subtotal": "Subtotal:",
+    "previousBalance": "Previous Balance:",
+    "totalAmountDue": "TOTAL AMOUNT DUE:"
+  },
+  "notes": "Notes:",
+  "footer": {
+    "thankYou": "Thank you for your payment!",
+    "paymentReminder": "Please make payment by the due date to avoid late fees."
+  },
+  "landlord": {
+    "name": "Name",
+    "address": "Address",
+    "phone": "Phone",
+    "bankAccount": "Bank Account"
+  },
+  "details": {
+    "invoiceNo": "Invoice No",
+    "invoiceDate": "Invoice Date",
+    "dueDate": "Due Date",
+    "billingPeriod": "Billing Period"
+  },
+  "tenant": {
+    "name": "Tenant Name",
+    "roomNumber": "Room Number",
+    "phone": "Phone Number",
+    "idNumber": "ID Number"
+  }
+}

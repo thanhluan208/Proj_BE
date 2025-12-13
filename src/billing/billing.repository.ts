@@ -29,17 +29,10 @@ export class BillingRepository {
     });
   }
 
-  findByTenant(tenantId: string): Promise<BillingEntity[]> {
-    return this.repository.find({
-      where: { tenant: { id: tenantId } },
-      order: { month: 'DESC' },
-    });
-  }
-
   findByRoom(roomId: string): Promise<BillingEntity[]> {
     return this.repository.find({
       where: { room: { id: roomId } },
-      order: { month: 'DESC' },
+      order: { from: 'DESC' },
     });
   }
 }

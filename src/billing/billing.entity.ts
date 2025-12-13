@@ -7,11 +7,15 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  JoinColumn,
   ManyToOne,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { BillingStatusEnum } from './billing-status.enum';
+import { TenantContractEntity } from 'src/tenant-contracts/tenant-contracts.entity';
+import { FileEntity } from 'src/files/file.entity';
 
 @Entity({
   name: 'billing',
@@ -24,30 +28,40 @@ export class BillingEntity extends EntityRelationalHelper {
   id: string;
 
   @ApiProperty({
-    type: () => TenantEntity,
+    type: () => TenantContractEntity,
   })
-  @ManyToOne(() => TenantEntity, {
-    eager: true,
-  })
-  tenant: TenantEntity;
+  @ManyToOne(() => TenantContractEntity)
+  tenantContract: TenantContractEntity;
 
   @ApiProperty({
     type: () => RoomEntity,
   })
-  @ManyToOne(() => RoomEntity, {
-    eager: true,
-  })
+  @ManyToOne(() => RoomEntity)
   room: RoomEntity;
+
+  @ApiProperty({
+    type: () => FileEntity,
+  })
+  @OneToOne(() => FileEntity)
+  @JoinColumn({ name: 'fileId' })
+  file?: FileEntity;
 
   @ApiProperty({
     type: Date,
   })
   @Column({ type: 'date' })
-  month: Date;
+  from: Date;
+
+  @ApiProperty({
+    type: Date,
+  })
+  @Column({ type: 'date' })
+  to: Date;
 
   @ApiProperty({
     type: Number,
     example: 100,
+    nullable: true,
   })
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   electricity_start_index: number;
@@ -55,6 +69,7 @@ export class BillingEntity extends EntityRelationalHelper {
   @ApiProperty({
     type: Number,
     example: 150,
+    nullable: true,
   })
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   electricity_end_index: number;
@@ -62,6 +77,7 @@ export class BillingEntity extends EntityRelationalHelper {
   @ApiProperty({
     type: Number,
     example: 50,
+    nullable: true,
   })
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   water_start_index: number;
@@ -69,51 +85,10 @@ export class BillingEntity extends EntityRelationalHelper {
   @ApiProperty({
     type: Number,
     example: 60,
+    nullable: true,
   })
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   water_end_index: number;
-
-  @ApiProperty({
-    type: Number,
-    example: 150000,
-  })
-  @Column({ type: 'decimal', precision: 15, scale: 2 })
-  total_electricity_cost: number;
-
-  @ApiProperty({
-    type: Number,
-    example: 100000,
-  })
-  @Column({ type: 'decimal', precision: 15, scale: 2 })
-  total_water_cost: number;
-
-  @ApiProperty({
-    type: Number,
-    example: 100000,
-  })
-  @Column({ type: 'decimal', precision: 15, scale: 2 })
-  total_living_cost: number;
-
-  @ApiProperty({
-    type: Number,
-    example: 100000,
-  })
-  @Column({ type: 'decimal', precision: 15, scale: 2 })
-  total_parking_cost: number;
-
-  @ApiProperty({
-    type: Number,
-    example: 50000,
-  })
-  @Column({ type: 'decimal', precision: 15, scale: 2 })
-  total_cleaning_cost: number;
-
-  @ApiProperty({
-    type: Number,
-    example: 5000000,
-  })
-  @Column({ type: 'decimal', precision: 15, scale: 2 })
-  base_rent: number;
 
   @ApiProperty({
     type: Number,

@@ -88,7 +88,6 @@ import { TenantContractsModule } from './tenant-contracts/tenant-contracts.modul
     AuthModule,
     MailModule,
     MailerModule,
-
     HousesModule,
     RoomModule,
     TenantModule,
