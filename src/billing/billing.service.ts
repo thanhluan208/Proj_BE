@@ -6,29 +6,33 @@ import {
 } from '@nestjs/common';
 import { JwtPayloadType } from 'src/auth/strategies/types/jwt-payload.type';
 import { RedisService } from 'src/redis/redis.service';
+import { RoomEntity } from 'src/rooms/room.entity';
 import { RoomsService } from 'src/rooms/rooms.service';
-import { TenantService } from 'src/tenant/tenant.service';
+import { StatusEnum } from 'src/statuses/statuses.enum';
+import { TenantContractsService } from 'src/tenant-contracts/tenant-contracts.service';
 import { BillingStatusEnum } from './billing-status.enum';
 import { BillingRepository } from './billing.repository';
 import { CreateBillingDto } from './dto/create-billing.dto';
-import { ContractsService } from 'src/contracts/contracts.service';
-import { RoomEntity } from 'src/rooms/room.entity';
-import { TenantContractsService } from 'src/tenant-contracts/tenant-contracts.service';
-import { StatusEnum } from 'src/statuses/statuses.enum';
 
-import * as ExcelJS from 'exceljs';
-import * as path from 'path';
-import * as fs from 'fs/promises';
-import { I18nContext, I18nService } from 'nestjs-i18n';
-import { generateBillingExcel, UltilityDetail } from './billing.util';
-import { FilesService } from 'src/files/files.service';
 import dayjs from 'dayjs';
+import { I18nContext, I18nService } from 'nestjs-i18n';
+import * as path from 'path';
+import { FilesService } from 'src/files/files.service';
+import { generateBillingExcel, UltilityDetail } from './billing.util';
+import { REDIS_PREFIX_KEY } from 'src/utils/constant';
+import { createHash } from 'crypto';
+import { GetBillingDto } from './dto/get-billing.dto';
+import { BillingEntity } from './billing.entity';
 
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
   private readonly CACHE_BILLING_TTL = 60 * 5; // 5 minutes
-  private readonly outputDir: string;
+  private readonly CACHE_CONTRACT_VERSION_KEY = `${REDIS_PREFIX_KEY.billing}:version`;
+  private readonly CACHED_KEY = {
+    getTotalBillByRoom: 'getTotalBillByRoom',
+    findBillsByRoom: 'findBillsByRoom',
+  };
 
   constructor(
     private readonly repository: BillingRepository,
@@ -37,9 +41,7 @@ export class BillingService {
     private readonly redisService: RedisService,
     private readonly i18nService: I18nService,
     private readonly fileService: FilesService,
-  ) {
-    this.outputDir = path.join(process.cwd(), 'generated-invoices');
-  }
+  ) {}
 
   async create(dto: CreateBillingDto, user: JwtPayloadType) {
     const { roomId } = dto;
@@ -55,8 +57,6 @@ export class BillingService {
         message: 'Room not found',
       });
     }
-
-    console.log('[ROOM:]', room);
 
     const activeContract = room.contracts.find(
       (elm) => elm.status?.id === StatusEnum.active,
@@ -224,9 +224,6 @@ export class BillingService {
       bankName: room.house.owner.bankName,
     };
 
-    // return result;
-    await this.ensureOutputDirectory();
-
     const buffer = await generateBillingExcel(
       {
         room,
@@ -273,23 +270,134 @@ export class BillingService {
     return result;
   }
 
-  private async ensureOutputDirectory(): Promise<void> {
-    try {
-      await fs.access(this.outputDir);
-    } catch {
-      await fs.mkdir(this.outputDir, { recursive: true });
+  async getTotalBillByRoom(dto: GetBillingDto, user: JwtPayloadType) {
+    const { room: roomId, ...options } = dto;
+    const userId = user.id;
+
+    const cacheVersion = await this.getCacheVersion(user.id);
+
+    const hashKey = createHash('sha256')
+      .update(
+        JSON.stringify({
+          ...options,
+          roomId,
+          userId,
+          isCounting: true,
+        }),
+      )
+      .digest('hex');
+
+    const cachedKey = `${this.CACHED_KEY.getTotalBillByRoom}:${hashKey}:${cacheVersion}`;
+
+    let total = 0;
+    const cachedTotal = await this.redisService.get(cachedKey);
+    if (cachedTotal) {
+      return {
+        total: Number(JSON.parse(cachedTotal)),
+      };
     }
+
+    const room = this.roomService.findById(roomId, userId);
+    if (!room) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: '[msg]',
+      });
+    }
+
+    total = (await this.repository.findByRoom({
+      roomId,
+      userId,
+      isCounting: true,
+      ...options,
+    })) as number;
+
+    if (total > 0) {
+      this.redisService.set(
+        cachedKey,
+        JSON.stringify(total),
+        this.CACHE_BILLING_TTL,
+      );
+    }
+
+    return {
+      total,
+    };
   }
 
-  async saveToFile(data: any, filename?: string): Promise<string> {
-    await this.ensureOutputDirectory();
+  async getBillsByRoom(dto: GetBillingDto, user: JwtPayloadType) {
+    const { room: roomId, ...options } = dto;
+    const userId = user.id;
 
-    const buffer = await generateBillingExcel(data, this.i18nService);
-    const fileName =
-      filename || `invoice-${data.invoiceNumber}-${Date.now()}.xlsx`;
-    const filePath = path.join(this.outputDir, fileName);
+    const cacheVersion = await this.getCacheVersion(user.id);
 
-    await fs.writeFile(filePath, buffer);
-    return filePath;
+    const hashKey = createHash('sha256')
+      .update(
+        JSON.stringify({
+          ...options,
+          roomId,
+          userId,
+        }),
+      )
+      .digest('hex');
+
+    const cachedKey = `${this.CACHED_KEY.findBillsByRoom}:${hashKey}:${cacheVersion}`;
+
+    const cachedData = await this.redisService.get(cachedKey);
+    if (cachedData) {
+      return {
+        page: options.page || 1,
+        pageSize: options.pageSize || 10,
+        data: JSON.parse(cachedData) as BillingEntity[],
+      };
+    }
+
+    const room = this.roomService.findById(roomId, userId);
+    if (!room) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: '[msg]',
+      });
+    }
+
+    const bills = (await this.repository.findByRoom(
+      {
+        roomId,
+        userId,
+        ...options,
+      },
+      ['tenantContract', 'tenantContract.tenant', 'tenantContract.contract'],
+    )) as BillingEntity[];
+
+    if (bills.length > 0) {
+      this.redisService.set(
+        cachedKey,
+        JSON.stringify(bills),
+        this.CACHE_BILLING_TTL,
+      );
+    }
+
+    return {
+      page: options.page || 1,
+      pageSize: options.pageSize || 10,
+      data: bills,
+    };
+  }
+
+  async getCacheVersion(userId: string) {
+    let cachedVersion = 0;
+    const dataCached = await this.redisService.get(
+      `${this.CACHE_CONTRACT_VERSION_KEY}:${userId}`,
+    );
+
+    if (dataCached) return JSON.parse(dataCached) as number;
+    else
+      this.redisService.set(
+        `${this.CACHE_CONTRACT_VERSION_KEY}:${userId}`,
+        JSON.stringify(cachedVersion),
+        86400,
+      );
+
+    return cachedVersion;
   }
 }

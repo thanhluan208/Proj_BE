@@ -8,6 +8,7 @@ export const REDIS_PREFIX_KEY = {
   house: 'house',
   room: 'room',
   contract: 'contract',
+  billing: 'billing',
   tenantContract: 'tenantContract',
 };
 

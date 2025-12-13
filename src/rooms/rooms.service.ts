@@ -30,6 +30,7 @@ import { IsNull, Repository } from 'typeorm';
 import { BillingEntity } from 'src/billing/billing.entity';
 import { RoomExpenseEntity } from 'src/room-expenses/room-expense.entity';
 import { createHash } from 'crypto';
+import { BillingStatusEnum } from 'src/billing/billing-status.enum';
 
 @Injectable()
 export class RoomsService {
@@ -200,6 +201,7 @@ export class RoomsService {
       .createQueryBuilder('billing')
       .select('SUM(billing.total_amount)', 'sum')
       .where('billing.roomId = :roomId', { roomId: room.id })
+      .andWhere('billing.status = :status', { status: BillingStatusEnum.PAID })
       .getRawOne();
 
     const totalExpensesResult = await this.roomExpenseRepository
