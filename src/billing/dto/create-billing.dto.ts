@@ -7,7 +7,6 @@ import {
   IsNumberString,
   IsOptional,
   IsString,
-  IsUUID,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -114,24 +113,28 @@ export class CreateBillingDto {
 
   @ApiProperty({ example: 100 })
   @IsNotEmpty()
+  @Transform(({ value }) => Number(value))
   @IsNumber()
   @Min(0)
   electricity_start_index: number;
 
   @ApiProperty({ example: 150 })
   @IsNotEmpty()
+  @Transform(({ value }) => Number(value))
   @IsNumber()
   @Min(0)
   electricity_end_index: number;
 
   @ApiProperty({ example: 50 })
   @IsNotEmpty()
+  @Transform(({ value }) => Number(value))
   @IsNumber()
   @Min(0)
   water_start_index: number;
 
   @ApiProperty({ example: 60 })
   @IsNotEmpty()
+  @Transform(({ value }) => Number(value))
   @IsNumber()
   @Min(0)
   water_end_index: number;

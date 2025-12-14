@@ -91,9 +91,6 @@ export class FilesService {
 
     const fileId = randomUUID();
     const fileExtension = this.getFileExtension(file.originalname);
-    // Use custom path but append extension if not present, or just use as is?
-    // The requirement is [tenant-id]_[front/back]-ID.
-    // It's better to append the extension to ensure valid file type.
     const fileName = `${customPath}${fileExtension}`;
     const bucketname = this.configService.getOrThrow('minio.bucketName', {
       infer: true,

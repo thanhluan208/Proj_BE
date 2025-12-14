@@ -24,10 +24,35 @@ export class BillingRepository {
     );
   }
 
-  findById(id: string): Promise<BillingEntity | null> {
-    return this.repository.findOne({
-      where: { id },
+  async findById(
+    id: string,
+    userId: string,
+    relations: string[] = [],
+  ): Promise<BillingEntity | null> {
+    const query = this.repository
+      .createQueryBuilder('billing')
+      .leftJoin('billing.room', 'room')
+      .leftJoin('room.house', 'house')
+      .leftJoin('house.owner', 'owner')
+      .where('billing.id = :id', { id })
+      .andWhere('owner.id = :userId', { userId });
+
+    applyRelations(query, relations, {
+      rootAlias: 'billing',
+      allowedRelations: [
+        'tenantContract',
+        'tenantContract.tenant',
+        'tenantContract.contract',
+        'room',
+        'room.house',
+        'room.house.owner',
+        'file',
+        'proof',
+      ],
+      select: true,
     });
+
+    return query.getOne();
   }
 
   async findByRoom(
@@ -83,5 +108,10 @@ export class BillingRepository {
 
     // ---------- Data ----------
     return query.orderBy('billing.from', 'DESC').getMany();
+  }
+
+  async softDelete(id: string): Promise<boolean> {
+    const result = await this.repository.softDelete(id);
+    return (result.affected ?? 0) > 0;
   }
 }

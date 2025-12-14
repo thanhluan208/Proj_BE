@@ -47,6 +47,13 @@ export class BillingEntity extends EntityRelationalHelper {
   file?: FileEntity;
 
   @ApiProperty({
+    type: () => FileEntity,
+  })
+  @OneToOne(() => FileEntity)
+  @JoinColumn({ name: 'proofId' })
+  proof?: FileEntity;
+
+  @ApiProperty({
     type: Date,
   })
   @Column({ type: 'date' })

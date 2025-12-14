@@ -33,8 +33,12 @@ export function applyRelations<T extends ObjectLiteral>(
 
   const aliasMap = new Map<string, string>();
 
+  // Get existing joins to avoid duplicates
+  const existingAliases = new Set(
+    query.expressionMap.joinAttributes.map((join) => join.alias.name),
+  );
+
   relations.forEach((relationPath) => {
-    // ---------- Allow-list validation ----------
     if (
       allowedRelations &&
       !allowedRelations.some(
@@ -55,13 +59,23 @@ export function applyRelations<T extends ObjectLiteral>(
       if (!aliasMap.has(accumulatedPath)) {
         const alias = accumulatedPath.replace(/\./g, '_');
 
-        if (select) {
-          query.leftJoinAndSelect(`${parentAlias}.${part}`, alias);
+        // Check if alias already exists in query
+        if (existingAliases.has(alias)) {
+          // If it exists and we need select, add select to existing join
+          if (select) {
+            query.addSelect(alias);
+          }
+          aliasMap.set(accumulatedPath, alias);
         } else {
-          query.leftJoin(`${parentAlias}.${part}`, alias);
+          // Create new join
+          if (select) {
+            query.leftJoinAndSelect(`${parentAlias}.${part}`, alias);
+          } else {
+            query.leftJoin(`${parentAlias}.${part}`, alias);
+          }
+          aliasMap.set(accumulatedPath, alias);
+          existingAliases.add(alias);
         }
-
-        aliasMap.set(accumulatedPath, alias);
       }
 
       parentAlias = aliasMap.get(accumulatedPath)!;

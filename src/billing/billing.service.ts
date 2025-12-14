@@ -13,6 +13,7 @@ import { TenantContractsService } from 'src/tenant-contracts/tenant-contracts.se
 import { BillingStatusEnum } from './billing-status.enum';
 import { BillingRepository } from './billing.repository';
 import { CreateBillingDto } from './dto/create-billing.dto';
+import { PayBillingDto } from './dto/pay-billing.dto';
 
 import dayjs from 'dayjs';
 import { I18nContext, I18nService } from 'nestjs-i18n';
@@ -23,6 +24,7 @@ import { REDIS_PREFIX_KEY } from 'src/utils/constant';
 import { createHash } from 'crypto';
 import { GetBillingDto } from './dto/get-billing.dto';
 import { BillingEntity } from './billing.entity';
+import { FileEntity } from 'src/files/file.entity';
 
 @Injectable()
 export class BillingService {
@@ -44,6 +46,185 @@ export class BillingService {
   ) {}
 
   async create(dto: CreateBillingDto, user: JwtPayloadType) {
+    const { currentTenantContract, file, totalAmount } =
+      await this.generateBill(dto, user);
+
+    const newBill = await this.repository.create({
+      room: {
+        id: dto.roomId,
+      } as RoomEntity,
+      total_amount: totalAmount,
+      status: BillingStatusEnum.PENDING_TENANT_PAYMENT,
+      tenantContract: currentTenantContract,
+      from: dto.from,
+      to: dto.to,
+      file: file,
+      water_end_index: dto.water_end_index,
+      water_start_index: dto.water_start_index,
+      electricity_end_index: dto.electricity_end_index,
+      electricity_start_index: dto.electricity_start_index,
+    });
+
+    this.redisService.incr(`${this.CACHE_CONTRACT_VERSION_KEY}:${user.id}`);
+
+    return newBill;
+  }
+
+  async delete(id: string, user: JwtPayloadType) {
+    const targetBill = await this.repository.findById(id, user.id);
+    if (!targetBill) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'No bill found',
+      });
+    }
+
+    await this.repository.softDelete(id);
+    await this.redisService.incr(
+      `${this.CACHE_CONTRACT_VERSION_KEY}:${user.id}`,
+    );
+
+    return targetBill;
+  }
+
+  async update(id: string, dto: CreateBillingDto, user: JwtPayloadType) {
+    const targetBill = await this.repository.findById(id, user.id);
+    if (!targetBill) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'No bill found',
+      });
+    }
+
+    if (targetBill.status === BillingStatusEnum.PAID) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'This bill have been already paid! Can not update.',
+      });
+    }
+
+    const { currentTenantContract, file, totalAmount } =
+      await this.generateBill(dto, user);
+
+    const newBill = await this.repository.update(id, {
+      room: {
+        id: dto.roomId,
+      } as RoomEntity,
+      total_amount: totalAmount,
+      status: BillingStatusEnum.PENDING_TENANT_PAYMENT,
+      tenantContract: currentTenantContract,
+      from: dto.from,
+      to: dto.to,
+      file: file,
+      water_end_index: dto.water_end_index,
+      water_start_index: dto.water_start_index,
+      electricity_end_index: dto.electricity_end_index,
+      electricity_start_index: dto.electricity_start_index,
+    });
+
+    await this.redisService.incr(
+      `${this.CACHE_CONTRACT_VERSION_KEY}:${user.id}`,
+    );
+    return newBill;
+  }
+
+  async pay(
+    id: string,
+    dto: PayBillingDto,
+    user: JwtPayloadType,
+    file?: Express.Multer.File,
+  ) {
+    const targetBill = await this.repository.findById(id, user.id, [
+      'room',
+      'room.house',
+      'room.house.owner',
+    ]);
+
+    if (!targetBill) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'No bill found',
+      });
+    }
+
+    if (targetBill.status === BillingStatusEnum.PAID) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'This bill have been already paid! Can not update.',
+      });
+    }
+    const room = targetBill.room;
+
+    let proof: FileEntity | undefined = undefined;
+
+    if (file) {
+      const fileName = `proof-${targetBill.id}-${dayjs().format('DD_MM_YYYY_HH_mm_ss')}`;
+      const filePath = `${user.id}/${room.house.id}/${room.id}/billing/${dayjs(targetBill.from).format('MM-YYYY')}/${fileName}`;
+
+      const uploadedFile = await this.fileService.uploadFileWithCustomPath(
+        file,
+        filePath,
+        user.id,
+      );
+
+      proof = {
+        ...new FileEntity(),
+        ...uploadedFile,
+      };
+    }
+
+    const result = await this.repository.update(id, {
+      payment_date: dto.paymentDate,
+      status: BillingStatusEnum.PAID,
+      proof,
+    });
+
+    await this.redisService.incr(
+      `${this.CACHE_CONTRACT_VERSION_KEY}:${user.id}`,
+    );
+
+    return targetBill;
+  }
+
+  async download(id: string, user: JwtPayloadType) {
+    const targetBill = await this.repository.findById(id, user.id, ['file']);
+    if (!targetBill) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'No bill found',
+      });
+    }
+
+    if (!targetBill.file) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'No file found',
+      });
+    }
+
+    return this.fileService.getFileStream(targetBill.file.id);
+  }
+
+  async downloadProof(id: string, user: JwtPayloadType) {
+    const targetBill = await this.repository.findById(id, user.id, ['proof']);
+    if (!targetBill) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'No bill found',
+      });
+    }
+
+    if (!targetBill.proof) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'No proof found',
+      });
+    }
+
+    return this.fileService.getFileStream(targetBill.proof.id);
+  }
+
+  async generateBill(dto: CreateBillingDto, user: JwtPayloadType) {
     const { roomId } = dto;
     const lang = I18nContext.current()?.lang;
 
@@ -241,7 +422,7 @@ export class BillingService {
       this.i18nService,
     );
     const fileName = `invoice-${room.name}-${Date.now()}.xlsx`;
-    const filePath = `${user.id}/${room.house.id}/${room.id}/billing/${dayjs().format('MM-YYYY')}/${fileName}`;
+    const filePath = `${user.id}/${room.house.id}/${room.id}/billing/${dayjs(dto.from).format('MM-YYYY')}/${fileName}`;
 
     const file = await this.fileService.uploadBufferWithCustomPath(
       buffer,
@@ -251,23 +432,11 @@ export class BillingService {
       user.id,
     );
 
-    const result = await this.repository.create({
-      room: {
-        id: dto.roomId,
-      } as RoomEntity,
-      total_amount: totalAmount,
-      status: BillingStatusEnum.PENDING_TENANT_PAYMENT,
-      tenantContract: currentTenantContract,
-      from: dto.from,
-      to: dto.to,
-      file: file,
-      water_end_index: dto.water_end_index,
-      water_start_index: dto.water_start_index,
-      electricity_end_index: dto.electricity_end_index,
-      electricity_start_index: dto.electricity_start_index,
-    });
-
-    return result;
+    return {
+      file,
+      currentTenantContract,
+      totalAmount,
+    };
   }
 
   async getTotalBillByRoom(dto: GetBillingDto, user: JwtPayloadType) {
@@ -385,7 +554,7 @@ export class BillingService {
   }
 
   async getCacheVersion(userId: string) {
-    let cachedVersion = 0;
+    const cachedVersion = 0;
     const dataCached = await this.redisService.get(
       `${this.CACHE_CONTRACT_VERSION_KEY}:${userId}`,
     );
