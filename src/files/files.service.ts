@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import * as Minio from 'minio';
 import { randomUUID } from 'node:crypto';
@@ -11,6 +12,7 @@ import { AllConfigType } from 'src/config/config.type';
 import { InjectMinio } from './decorator/minio.decorator';
 import { FileEntity } from './file.entity';
 import * as path from 'path';
+import { Response } from 'express';
 
 @Injectable()
 export class FilesService {
@@ -121,6 +123,7 @@ export class FilesService {
       const savedFile = await this.fileRepository.create(fileData);
 
       return {
+        file: savedFile,
         id: savedFile.id,
         path: savedFile.path,
         mimeType: savedFile.mimeType,
@@ -287,6 +290,30 @@ export class FilesService {
         `Failed to retrieve file: ${error.message}`,
       );
     }
+  }
+
+  async streamImage(fileId: string, user: { id: string }, res: Response) {
+    const file = await this.fileRepository.findById(fileId);
+
+    if (!file) {
+      throw new NotFoundException('File not found');
+    }
+
+    // 🔐 Permission check
+    if (file.owner.id !== user.id) {
+      throw new ForbiddenException();
+    }
+
+    const bucketname = this.configService.getOrThrow('minio.bucketName', {
+      infer: true,
+    });
+
+    const stream = await this.minioService.getObject(bucketname, file.path);
+
+    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+
+    stream.pipe(res);
   }
 
   async getFileBuffer(

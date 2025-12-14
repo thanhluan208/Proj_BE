@@ -6,6 +6,7 @@ import { OrNeverType } from '../../utils/types/or-never.type';
 import { JwtPayloadType } from './types/jwt-payload.type';
 import { AllConfigType } from '../../config/config.type';
 import { AUTH_CONSTANTS } from 'src/utils/constant';
+import { jwtFromCookie } from '../jwt-cookies.extractor';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(
@@ -14,7 +15,10 @@ export class JwtStrategy extends PassportStrategy(
 ) {
   constructor(configService: ConfigService<AllConfigType>) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        jwtFromCookie,
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ]),
       secretOrKey: configService.getOrThrow('auth.secret', { infer: true }),
     });
   }

@@ -6,11 +6,14 @@ import {
   DeleteDateColumn,
   Entity,
   Index,
+  JoinColumn,
   ManyToOne,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { RoomEntity } from 'src/rooms/room.entity';
+import { FileEntity } from 'src/files/file.entity';
 
 @Entity({
   name: 'room_expense',
@@ -39,6 +42,22 @@ export class RoomExpenseEntity extends EntityRelationalHelper {
   })
   @Column({ type: 'text' })
   name: string;
+
+  @ApiProperty({
+    type: String,
+    example: 'light bulb replacement',
+    nullable: true,
+  })
+  @Column({ type: 'text', nullable: true })
+  notes: string | null;
+
+  @ApiProperty({
+    type: () => FileEntity,
+    nullable: true,
+  })
+  @OneToOne(() => FileEntity, { nullable: true })
+  @JoinColumn({ name: 'receiptId' })
+  receipt: FileEntity | null;
 
   @ApiProperty({
     type: Number,

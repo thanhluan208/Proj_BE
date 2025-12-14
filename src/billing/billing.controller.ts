@@ -117,38 +117,6 @@ export class BillingController {
     return this.service.getTotalBillByRoom(query, request.user);
   }
 
-  @Post('test')
-  @HttpCode(HttpStatus.OK)
-  @ApiConsumes('multipart/form-data')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: multer.memoryStorage(),
-      limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB
-      },
-    }),
-  )
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        file: { type: 'string', format: 'binary' },
-        folder: { type: 'string' },
-      },
-    },
-  })
-  async uploadFile(
-    @Body() body,
-    @UploadedFile(
-      new ParseFilePipeBuilder()
-        .addMaxSizeValidator({ maxSize: 5 * 1024 * 1024 })
-        .build(),
-    )
-    file: Express.Multer.File,
-  ) {
-    return this.minioService.uploadFile(file);
-  }
-
   @Post(':id/pay')
   @HttpCode(HttpStatus.OK)
   @ApiConsumes('multipart/form-data')

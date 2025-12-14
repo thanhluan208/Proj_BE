@@ -7,10 +7,15 @@ import {
   UploadedFile,
   UseInterceptors,
   Query,
+  UseGuards,
+  Req,
+  Res,
 } from '@nestjs/common';
 import { FilesService } from './files.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiTags, ApiParam } from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
+import { Response } from 'express';
 
 @ApiTags('files')
 @Controller('files')
@@ -42,6 +47,12 @@ export class FilesController {
   @ApiParam({ name: 'id', description: 'File ID' })
   getFile(@Param('id') id: string) {
     return this.fileService.getFile(id);
+  }
+
+  @Get(':id/preview')
+  @UseGuards(AuthGuard('jwt'))
+  async preview(@Param('id') id: string, @Req() req, @Res() res: Response) {
+    await this.fileService.streamImage(id, req.user, res);
   }
 
   @Get('owner/:ownerId')

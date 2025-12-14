@@ -10,6 +10,7 @@ export const REDIS_PREFIX_KEY = {
   contract: 'contract',
   billing: 'billing',
   tenantContract: 'tenantContract',
+  roomExpense: 'roomExpense',
 };
 
 export const AUTH_CONSTANTS = {

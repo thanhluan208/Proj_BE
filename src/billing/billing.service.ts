@@ -30,7 +30,7 @@ import { FileEntity } from 'src/files/file.entity';
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
   private readonly CACHE_BILLING_TTL = 60 * 5; // 5 minutes
-  private readonly CACHE_CONTRACT_VERSION_KEY = `${REDIS_PREFIX_KEY.billing}:version`;
+  private readonly CACHE_BILLING_VERSION_KEY = `${REDIS_PREFIX_KEY.billing}:version`;
   private readonly CACHED_KEY = {
     getTotalBillByRoom: 'getTotalBillByRoom',
     findBillsByRoom: 'findBillsByRoom',
@@ -65,7 +65,7 @@ export class BillingService {
       electricity_start_index: dto.electricity_start_index,
     });
 
-    this.redisService.incr(`${this.CACHE_CONTRACT_VERSION_KEY}:${user.id}`);
+    this.redisService.incr(`${this.CACHE_BILLING_VERSION_KEY}:${user.id}`);
 
     return newBill;
   }
@@ -81,7 +81,7 @@ export class BillingService {
 
     await this.repository.softDelete(id);
     await this.redisService.incr(
-      `${this.CACHE_CONTRACT_VERSION_KEY}:${user.id}`,
+      `${this.CACHE_BILLING_VERSION_KEY}:${user.id}`,
     );
 
     return targetBill;
@@ -123,7 +123,7 @@ export class BillingService {
     });
 
     await this.redisService.incr(
-      `${this.CACHE_CONTRACT_VERSION_KEY}:${user.id}`,
+      `${this.CACHE_BILLING_VERSION_KEY}:${user.id}`,
     );
     return newBill;
   }
@@ -180,7 +180,7 @@ export class BillingService {
     });
 
     await this.redisService.incr(
-      `${this.CACHE_CONTRACT_VERSION_KEY}:${user.id}`,
+      `${this.CACHE_BILLING_VERSION_KEY}:${user.id}`,
     );
 
     return targetBill;
@@ -556,13 +556,13 @@ export class BillingService {
   async getCacheVersion(userId: string) {
     const cachedVersion = 0;
     const dataCached = await this.redisService.get(
-      `${this.CACHE_CONTRACT_VERSION_KEY}:${userId}`,
+      `${this.CACHE_BILLING_VERSION_KEY}:${userId}`,
     );
 
     if (dataCached) return JSON.parse(dataCached) as number;
     else
       this.redisService.set(
-        `${this.CACHE_CONTRACT_VERSION_KEY}:${userId}`,
+        `${this.CACHE_BILLING_VERSION_KEY}:${userId}`,
         JSON.stringify(cachedVersion),
         86400,
       );

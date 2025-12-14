@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -9,87 +10,112 @@ import {
   Post,
   Query,
   Request,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiCreatedResponse,
+  ApiOkResponse,
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
-import { AUTH_CONSTANTS } from 'src/utils/constant';
-import { OwnershipGuard } from 'src/auth/guards/ownership.guard';
-import { RoomExpensesService } from './room-expenses.service';
-import { CreateRoomExpenseDto } from './dto/create-room-expense.dto';
+import * as multer from 'multer';
 import { RoomExpenseEntity } from 'src/room-expenses/room-expense.entity';
+
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import {
   PaginatedResponseDto,
   PaginationInfoResponseDto,
 } from 'src/utils/dto/paginated-response.dto';
-import { PaginationDto } from 'src/utils/dto/pagination.dto';
-import { RoomEntity } from 'src/rooms/room.entity';
-import { CheckOwnershipDynamic } from 'src/auth/decorators/ownership.decorator';
+import { EditRoomExpenseDto } from './dto/create-room-expense.dto';
+import { GetRoomExpensesDto } from './dto/get-room-expense.dto';
+import { CreateApiBody } from './room-expense.helper';
+import { RoomExpensesService } from './room-expenses.service';
 
 @ApiBearerAuth()
 @ApiTags('room-expenses')
-@UseGuards(AuthGuard(AUTH_CONSTANTS.jwt), OwnershipGuard)
+@UseGuards(AuthGuard('jwt'))
 @Controller('room-expenses')
 export class RoomExpensesController {
   constructor(private readonly service: RoomExpensesService) {}
 
-  @ApiCreatedResponse({ type: RoomExpenseEntity })
+  @ApiCreatedResponse({ type: [RoomExpenseEntity] })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody(CreateApiBody)
   @Post('create')
   @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FilesInterceptor('receipts'))
   create(
     @Request() request,
-    @Body() body: CreateRoomExpenseDto,
-  ): Promise<RoomExpenseEntity> {
-    return this.service.create(body, request.user);
+    @Body('roomId') roomId: string,
+    @Body('expenses') expensesRaw: string,
+    @UploadedFiles() receipts: Express.Multer.File[],
+  ): Promise<RoomExpenseEntity[]> {
+    return this.service.create(roomId, expensesRaw, receipts, request.user);
   }
 
   @ApiCreatedResponse({ type: RoomExpenseEntity })
+  @ApiConsumes('multipart/form-data')
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiParam({ name: 'id', required: true, description: 'Room Expense ID' })
+  @UseInterceptors(
+    FileInterceptor('receipt', {
+      storage: multer.memoryStorage(),
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+    }),
+  )
   update(
     @Param('id') id: string,
     @Request() request,
-    @Body() body: CreateRoomExpenseDto,
+    @Body() body: EditRoomExpenseDto,
+    @UploadedFiles() receipt?: Express.Multer.File,
   ): Promise<RoomExpenseEntity | null> {
-    return this.service.update(id, body, request.user);
+    return this.service.update(id, body, request.user, receipt);
   }
 
-  @ApiCreatedResponse({ type: PaginatedResponseDto<RoomExpenseEntity> })
+  @ApiOkResponse({ type: PaginatedResponseDto<RoomExpenseEntity> })
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiParam({ name: 'id', required: true, description: 'Room Expense ID' })
+  delete(
+    @Param('id') id: string,
+    @Request() request,
+  ): Promise<RoomExpenseEntity> {
+    return this.service.delete(id, request.user);
+  }
+
+  @ApiOkResponse({ type: PaginatedResponseDto<RoomExpenseEntity> })
   @Get('room/:roomId')
   @HttpCode(HttpStatus.OK)
   @ApiParam({ name: 'roomId', required: true, description: 'Room ID' })
-  @CheckOwnershipDynamic({
-    entity: RoomEntity,
-    ownerField: 'house.owner',
-    resourceIdParam: 'roomId',
-  })
   findByRoom(
     @Param('roomId') roomId: string,
     @Request() request,
-    @Query() paginationDto: PaginationDto,
+    @Query() payload: Omit<GetRoomExpensesDto, 'room'>,
   ): Promise<PaginatedResponseDto<RoomExpenseEntity>> {
-    return this.service.findByRoom(roomId, request.user, paginationDto);
+    return this.service.findByRoom(request.user, {
+      room: roomId,
+      ...payload,
+    });
   }
 
-  @ApiCreatedResponse({ type: PaginationInfoResponseDto })
+  @ApiOkResponse({ type: PaginationInfoResponseDto })
   @Get('room/:roomId/paging')
   @HttpCode(HttpStatus.OK)
   @ApiParam({ name: 'roomId', required: true, description: 'Room ID' })
-  @CheckOwnershipDynamic({
-    entity: RoomEntity,
-    ownerField: 'house.owner',
-    resourceIdParam: 'roomId',
-  })
   getPagingByRoom(
     @Param('roomId') roomId: string,
     @Request() request,
+    @Query() payload: Omit<GetRoomExpensesDto, 'page' | 'pageSize'>,
   ): Promise<PaginationInfoResponseDto> {
-    return this.service.countByRoom(roomId, request.user);
+    return this.service.countByRoom(roomId, request.user, payload);
   }
 }

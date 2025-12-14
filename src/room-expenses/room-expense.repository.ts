@@ -4,6 +4,16 @@ import { IsNull, Repository } from 'typeorm';
 import { RoomExpenseEntity } from 'src/room-expenses/room-expense.entity';
 import { PaginationOptions } from 'src/utils/types/common.type';
 
+interface FindByRoomOptions {
+  skip: number;
+  take: number;
+  from?: string;
+  to?: string;
+  search?: string;
+  amount?: number;
+  comparison?: 'bigger' | 'smaller';
+}
+
 @Injectable()
 export class RoomExpenseRepository {
   constructor(
@@ -11,7 +21,7 @@ export class RoomExpenseRepository {
     private readonly repo: Repository<RoomExpenseEntity>,
   ) {}
 
-  async create(data: Partial<RoomExpenseEntity>) {
+  async create(data: Partial<RoomExpenseEntity>[]) {
     const entity = this.repo.create(data);
     return await this.repo.save(entity);
   }
@@ -23,23 +33,84 @@ export class RoomExpenseRepository {
     return await this.repo.save(entity);
   }
 
-  async findById(id: string) {
-    return await this.repo.findOne({ where: { id } });
+  async findById(id: string, relations?: string[]) {
+    return await this.repo.findOne({ where: { id }, relations });
   }
 
-  async findByRoom(roomId: string, options?: PaginationOptions) {
-    return await this.repo.find({
-      where: { room: { id: roomId }, deletedAt: IsNull() },
-      skip: options?.skip,
-      take: options?.take,
-      order: { date: 'DESC' },
-    });
+  async findByRoom(
+    roomId: string,
+    options: FindByRoomOptions,
+  ): Promise<RoomExpenseEntity[]> {
+    const query = this.repo
+      .createQueryBuilder('expense')
+      .leftJoinAndSelect('expense.receipt', 'receipt')
+      .where('expense.roomId = :roomId', { roomId });
+
+    // Date range filters
+    if (options.from) {
+      query.andWhere('expense.date >= :from', { from: options.from });
+    }
+    if (options.to) {
+      query.andWhere('expense.date <= :to', { to: options.to });
+    }
+
+    // Search by name
+    if (options.search) {
+      query.andWhere('expense.name ILIKE :search', {
+        search: `%${options.search}%`,
+      });
+    }
+
+    // Amount comparison filter
+    if (options.amount !== undefined && options.comparison) {
+      if (options.comparison === 'bigger') {
+        query.andWhere('expense.amount >= :amount', { amount: options.amount });
+      } else if (options.comparison === 'smaller') {
+        query.andWhere('expense.amount <= :amount', { amount: options.amount });
+      }
+    }
+
+    return query
+      .orderBy('expense.date', 'DESC')
+      .skip(options.skip)
+      .take(options.take)
+      .getMany();
   }
 
-  async countByRoom(roomId: string) {
-    return await this.repo.count({
-      where: { room: { id: roomId }, deletedAt: IsNull() },
-    });
+  async countByRoom(
+    roomId: string,
+    filters?: {
+      from?: string;
+      to?: string;
+      search?: string;
+      amount?: number;
+      comparison?: 'bigger' | 'smaller';
+    },
+  ): Promise<number> {
+    const query = this.repo
+      .createQueryBuilder('expense')
+      .where('expense.roomId = :roomId', { roomId });
+
+    if (filters?.from) {
+      query.andWhere('expense.date >= :from', { from: filters.from });
+    }
+    if (filters?.to) {
+      query.andWhere('expense.date <= :to', { to: filters.to });
+    }
+    if (filters?.search) {
+      query.andWhere('expense.name ILIKE :search', {
+        search: `%${filters.search}%`,
+      });
+    }
+    if (filters?.amount !== undefined && filters?.comparison) {
+      if (filters.comparison === 'bigger') {
+        query.andWhere('expense.amount >= :amount', { amount: filters.amount });
+      } else if (filters.comparison === 'smaller') {
+        query.andWhere('expense.amount <= :amount', { amount: filters.amount });
+      }
+    }
+
+    return query.getCount();
   }
 
   async remove(id: string) {
