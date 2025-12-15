@@ -10,6 +10,7 @@ import {
   Post,
   Query,
   Request,
+  UploadedFile,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -76,7 +77,7 @@ export class RoomExpensesController {
     @Param('id') id: string,
     @Request() request,
     @Body() body: EditRoomExpenseDto,
-    @UploadedFiles() receipt?: Express.Multer.File,
+    @UploadedFile() receipt?: Express.Multer.File,
   ): Promise<RoomExpenseEntity | null> {
     return this.service.update(id, body, request.user, receipt);
   }

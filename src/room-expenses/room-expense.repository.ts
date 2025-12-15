@@ -12,6 +12,8 @@ interface FindByRoomOptions {
   search?: string;
   amount?: number;
   comparison?: 'bigger' | 'smaller';
+  sortBy?: 'date' | 'amount' | 'name';
+  sortOrder?: 'ASC' | 'DESC';
 }
 
 @Injectable()
@@ -70,11 +72,26 @@ export class RoomExpenseRepository {
       }
     }
 
-    return query
-      .orderBy('expense.date', 'DESC')
-      .skip(options.skip)
-      .take(options.take)
-      .getMany();
+    // Sorting
+    const SORT_MAP = {
+      date: 'expense.date',
+      amount: 'expense.amount',
+      name: 'expense.name',
+    } as const;
+
+    const primarySort = options.sortBy
+      ? SORT_MAP[options.sortBy]
+      : 'expense.date';
+
+    const primaryOrder = options.sortOrder ?? 'DESC';
+
+    query.orderBy(primarySort, primaryOrder);
+
+    if (primarySort !== 'expense.date') {
+      query.addOrderBy('expense.date', 'DESC');
+    }
+
+    return query.skip(options.skip).take(options.take).getMany();
   }
 
   async countByRoom(

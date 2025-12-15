@@ -14,6 +14,17 @@ export enum ComparisonEnum {
   SMALLER = 'smaller',
 }
 
+export enum ExpenseSortField {
+  DATE = 'date',
+  AMOUNT = 'amount',
+  NAME = 'name',
+}
+
+export enum SortOrder {
+  ASC = 'ASC',
+  DESC = 'DESC',
+}
+
 export class GetRoomExpensesDto extends PaginationDto {
   @ApiProperty({
     type: String,
@@ -67,4 +78,22 @@ export class GetRoomExpensesDto extends PaginationDto {
   @IsOptional()
   @IsEnum(ComparisonEnum)
   comparison?: ComparisonEnum;
+
+  @ApiPropertyOptional({
+    enum: ExpenseSortField,
+    example: ExpenseSortField.DATE,
+    description: 'Primary field to sort expenses',
+  })
+  @IsOptional()
+  @IsEnum(ExpenseSortField)
+  sortBy?: ExpenseSortField;
+
+  @ApiPropertyOptional({
+    enum: SortOrder,
+    example: SortOrder.DESC,
+    description: 'Sort direction (ASC or DESC)',
+  })
+  @IsOptional()
+  @IsEnum(SortOrder)
+  sortOrder?: SortOrder;
 }

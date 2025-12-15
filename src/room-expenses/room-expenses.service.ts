@@ -25,6 +25,7 @@ import { RedisService } from 'src/redis/redis.service';
 import { GetRoomExpensesDto } from './dto/get-room-expense.dto';
 import { FilesService } from 'src/files/files.service';
 import { FileEntity } from 'src/files/file.entity';
+import { sortBy } from 'lodash';
 
 @Injectable()
 export class RoomExpensesService {
@@ -127,8 +128,7 @@ export class RoomExpensesService {
       });
     }
 
-    let newReceipt: FileEntity | null = null;
-    if (receipt) {
+    if (payload.hasFile && receipt instanceof File) {
       const fileName = payload.name;
       const filePath = `${user.id}/${room.house.id}/${room.id}/expense_receipts/${fileName}`;
 
@@ -137,20 +137,22 @@ export class RoomExpensesService {
         filePath,
         user.id,
       );
-      newReceipt = file.file;
+      current.receipt = file.file;
     }
+
+    if (!payload.hasFile) current.receipt = null;
 
     await this.redisService.incr(
       `${this.CACHE_ROOM_EXPENSE_VERSION_KEY}:${user.id}:${room.id}`,
     );
 
     return await this.expenseRepository.update(id, {
+      ...current,
       room,
       name: payload.name,
       amount: payload.amount,
       date: payload.date,
       notes: payload.notes || null,
-      receipt: newReceipt,
     });
   }
 
@@ -212,6 +214,8 @@ export class RoomExpensesService {
       search: payload.search,
       amount: payload.amount,
       comparison: payload.comparison,
+      sortBy: payload.sortBy,
+      sortOrder: payload.sortOrder,
     };
     const filterHash = createHash('sha256')
       .update(JSON.stringify(filters))
@@ -243,6 +247,8 @@ export class RoomExpensesService {
         search: payload.search,
         amount: payload.amount,
         comparison: payload.comparison,
+        sortBy: payload.sortBy,
+        sortOrder: payload.sortOrder,
       });
 
       if (expenses.length > 0 && expenses?.length === pageSize) {

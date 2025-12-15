@@ -42,6 +42,7 @@ export class Expense {
     type: String,
     example: 'Light bulb replacement',
   })
+  @Transform((value) => Boolean(value))
   @IsOptional()
   @IsBoolean()
   hasFile?: boolean;
