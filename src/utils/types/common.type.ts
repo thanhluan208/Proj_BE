@@ -9,3 +9,8 @@ export interface CommonResponse<T> {
   data?: T;
   errors?: Record<string, string>;
 }
+
+export enum SortOrder {
+  ASC = 'ASC',
+  DESC = 'DESC',
+}

@@ -8,6 +8,7 @@ import {
   IsDateString,
 } from 'class-validator';
 import { PaginationDto } from 'src/utils/dto/pagination.dto';
+import { SortOrder } from 'src/utils/types/common.type';
 
 export enum ComparisonEnum {
   BIGGER = 'bigger',
@@ -18,11 +19,6 @@ export enum ExpenseSortField {
   DATE = 'date',
   AMOUNT = 'amount',
   NAME = 'name',
-}
-
-export enum SortOrder {
-  ASC = 'ASC',
-  DESC = 'DESC',
 }
 
 export class GetRoomExpensesDto extends PaginationDto {

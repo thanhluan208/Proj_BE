@@ -22,9 +22,10 @@ import { FilesService } from 'src/files/files.service';
 import { generateBillingExcel, UltilityDetail } from './billing.util';
 import { REDIS_PREFIX_KEY } from 'src/utils/constant';
 import { createHash } from 'crypto';
-import { GetBillingDto } from './dto/get-billing.dto';
+import { BillingSortField, GetBillingDto } from './dto/get-billing.dto';
 import { BillingEntity } from './billing.entity';
 import { FileEntity } from 'src/files/file.entity';
+import { SortOrder } from 'src/utils/types/common.type';
 
 @Injectable()
 export class BillingService {
@@ -440,7 +441,7 @@ export class BillingService {
   }
 
   async getTotalBillByRoom(dto: GetBillingDto, user: JwtPayloadType) {
-    const { room: roomId, ...options } = dto;
+    const { room: roomId, sortBy, sortOrder, ...options } = dto;
     const userId = user.id;
 
     const cacheVersion = await this.getCacheVersion(user.id);
@@ -495,8 +496,10 @@ export class BillingService {
   }
 
   async getBillsByRoom(dto: GetBillingDto, user: JwtPayloadType) {
-    const { room: roomId, ...options } = dto;
+    const { room: roomId, sortBy, sortOrder, ...options } = dto;
     const userId = user.id;
+
+    console.log('dtodtodtodtodto', dto);
 
     const cacheVersion = await this.getCacheVersion(user.id);
 
@@ -506,6 +509,8 @@ export class BillingService {
           ...options,
           roomId,
           userId,
+          sortBy,
+          sortOrder,
         }),
       )
       .digest('hex');
@@ -533,6 +538,8 @@ export class BillingService {
       {
         roomId,
         userId,
+        sortBy: dto.sortBy as BillingSortField,
+        sortOrder: dto.sortOrder as SortOrder,
         ...options,
       },
       ['tenantContract', 'tenantContract.tenant', 'tenantContract.contract'],

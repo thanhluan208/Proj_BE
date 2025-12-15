@@ -33,6 +33,7 @@ import { TenantContractsService } from 'src/tenant-contracts/tenant-contracts.se
 import { TenantContractEntity } from 'src/tenant-contracts/tenant-contracts.entity';
 import { CreateTenantContractDto } from 'src/tenant-contracts/dto/create-tenant-contract.dto';
 import { createHash, hash } from 'crypto';
+import { DataSource } from 'typeorm';
 
 @Injectable()
 export class ContractsService {
@@ -47,6 +48,7 @@ export class ContractsService {
 
   constructor(
     private redisService: RedisService,
+    private readonly dataSource: DataSource,
     private readonly contractsRepository: ContractsRepository,
     private readonly tenantService: TenantService,
     private readonly roomService: RoomsService,
@@ -64,47 +66,57 @@ export class ContractsService {
       userJwtPayload,
     );
 
-    const { file } = await this.generateAndSaveContract(
-      owner,
-      room,
-      tenants,
-      contractData,
-    );
+    const activeContract = await this.contractsRepository.findActiveContract();
+    if (activeContract) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Only one active contract per room at a time allowed!',
+      });
+    }
 
-    const newContract = await this.contractsRepository.create({
-      room: {
-        id: room.id,
-      } as RoomEntity,
-      file: file,
-      status: {
-        id: StatusEnum.active,
-      } as StatusEntity,
-      createdDate: dayjs(contractData.createdDate).toDate(),
-      endDate: dayjs(contractData.endDate).toDate(),
-      startDate: dayjs(contractData.startDate).toDate(),
-      ...contractData.feeInfo,
-    });
-
-    const createTenantContractQueue: Promise<TenantContractEntity>[] = [];
-
-    tenants.forEach((tent, index) => {
-      createTenantContractQueue.push(
-        this.tenantContractsService.create(
-          {
-            contractId: newContract.id,
-            tenantId: tent.id,
-            isMainTenant: index === 0,
-          },
-          userJwtPayload.id,
-        ),
+    return this.dataSource.transaction(async (manager) => {
+      const { file } = await this.generateAndSaveContract(
+        owner,
+        room,
+        tenants,
+        contractData,
       );
+      await manager.save(file);
+
+      const newContract = await this.contractsRepository.create({
+        room: {
+          id: room.id,
+        } as RoomEntity,
+        file: file,
+        status: {
+          id: StatusEnum.active,
+        } as StatusEntity,
+        createdDate: dayjs(contractData.createdDate).toDate(),
+        endDate: dayjs(contractData.endDate).toDate(),
+        startDate: dayjs(contractData.startDate).toDate(),
+        ...contractData.feeInfo,
+      });
+      await manager.save(newContract);
+
+      const createTenantContractQueue: Promise<TenantContractEntity>[] = [];
+
+      tenants.forEach((tent, index) => {
+        createTenantContractQueue.push(
+          this.tenantContractsService.create(
+            {
+              contractId: newContract.id,
+              tenantId: tent.id,
+              isMainTenant: index === 0,
+            },
+            userJwtPayload.id,
+          ),
+        );
+      });
+
+      await Promise.all(createTenantContractQueue);
+
+      return newContract;
     });
-
-    await Promise.all(createTenantContractQueue);
-
-    return {
-      message: 'Contract created and saved successfully',
-    };
   }
 
   async delete(id: string, userJwtPayload: JwtPayloadType) {

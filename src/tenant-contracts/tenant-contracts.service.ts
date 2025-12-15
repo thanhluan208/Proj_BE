@@ -76,6 +76,7 @@ export class TenantContractsService {
       contract,
       tenant,
       status,
+      isMainTenant: createTenantContractDto.isMainTenant,
     });
 
     return tenantContract;

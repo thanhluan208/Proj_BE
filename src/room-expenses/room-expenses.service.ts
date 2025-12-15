@@ -5,27 +5,18 @@ import {
   Logger,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { JwtPayloadType } from 'src/auth/strategies/types/jwt-payload.type';
-import { RoomRepository } from 'src/rooms/room.repository';
-import {
-  CreateRoomExpenseDto,
-  EditRoomExpenseDto,
-  Expense,
-} from './dto/create-room-expense.dto';
-import { RoomExpenseRepository } from './room-expense.repository';
-import { RoomExpenseEntity } from 'src/room-expenses/room-expense.entity';
-import { PaginationDto } from 'src/utils/dto/pagination.dto';
-import {
-  PaginatedResponseDto,
-  PaginationInfoResponseDto,
-} from 'src/utils/dto/paginated-response.dto';
-import { REDIS_PREFIX_KEY } from 'src/utils/constant';
 import { createHash } from 'node:crypto';
-import { RedisService } from 'src/redis/redis.service';
-import { GetRoomExpensesDto } from './dto/get-room-expense.dto';
-import { FilesService } from 'src/files/files.service';
+import { JwtPayloadType } from 'src/auth/strategies/types/jwt-payload.type';
 import { FileEntity } from 'src/files/file.entity';
-import { sortBy } from 'lodash';
+import { FilesService } from 'src/files/files.service';
+import { RedisService } from 'src/redis/redis.service';
+import { RoomExpenseEntity } from 'src/room-expenses/room-expense.entity';
+import { RoomRepository } from 'src/rooms/room.repository';
+import { REDIS_PREFIX_KEY } from 'src/utils/constant';
+import { PaginatedResponseDto } from 'src/utils/dto/paginated-response.dto';
+import { EditRoomExpenseDto, Expense } from './dto/create-room-expense.dto';
+import { GetRoomExpensesDto } from './dto/get-room-expense.dto';
+import { RoomExpenseRepository } from './room-expense.repository';
 
 @Injectable()
 export class RoomExpensesService {
@@ -128,7 +119,7 @@ export class RoomExpensesService {
       });
     }
 
-    if (payload.hasFile && receipt instanceof File) {
+    if (payload.hasFile && receipt?.buffer) {
       const fileName = payload.name;
       const filePath = `${user.id}/${room.house.id}/${room.id}/expense_receipts/${fileName}`;
 

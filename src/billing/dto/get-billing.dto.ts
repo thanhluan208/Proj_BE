@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsDateString,
   IsEnum,
@@ -8,6 +8,15 @@ import {
 } from 'class-validator';
 import { PaginationDto } from 'src/utils/dto/pagination.dto';
 import { BillingStatusEnum } from '../billing-status.enum';
+import { SortOrder } from 'src/utils/types/common.type';
+
+export enum BillingSortField {
+  createdAt = 'createdAt',
+  electricity_usage = 'electricity_usage',
+  water_usage = 'water_usage',
+  total_amount = 'totalAmount',
+  payment_date = 'paymentDate',
+}
 
 export class GetBillingDto extends PaginationDto {
   @ApiProperty({
@@ -45,4 +54,22 @@ export class GetBillingDto extends PaginationDto {
   @IsOptional()
   @IsDateString()
   to?: Date;
+
+  @ApiPropertyOptional({
+    enum: BillingSortField,
+    example: BillingSortField.createdAt,
+    description: 'Primary field to sort expenses',
+  })
+  @IsOptional()
+  @IsEnum(BillingSortField)
+  sortBy?: BillingSortField;
+
+  @ApiPropertyOptional({
+    enum: SortOrder,
+    example: SortOrder.DESC,
+    description: 'Sort direction (ASC or DESC)',
+  })
+  @IsOptional()
+  @IsEnum(SortOrder)
+  sortOrder?: SortOrder;
 }

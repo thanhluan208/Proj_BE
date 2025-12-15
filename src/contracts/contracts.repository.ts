@@ -16,6 +16,12 @@ export class ContractsRepository {
     return await this.contractRepository.save(contract);
   }
 
+  async findActiveContract() {
+    return await this.contractRepository.findOne({
+      where: { status: { id: StatusEnum.active } },
+    });
+  }
+
   async findAll(
     options?: FindManyOptions<ContractEntity>,
   ): Promise<ContractEntity[]> {
