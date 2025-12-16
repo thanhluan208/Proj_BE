@@ -100,9 +100,7 @@ export class VisionService {
       return this.mapToBackDto(data);
     } catch (error) {
       this.logger.error(`ID back recognition failed: ${error.message}`);
-      throw new BadRequestException(
-        `Failed to recognize ID back: ${error.message}`,
-      );
+      return this.mapToBackDto({});
     }
   }
 
@@ -115,7 +113,7 @@ export class VisionService {
       errorMessage: '',
       data: [
         {
-          id: sanitize(data.id),
+          citizenId: sanitize(data.id),
           name: sanitize(data.name),
           dob: sanitize(data.dob),
           sex: sanitize(data.sex),

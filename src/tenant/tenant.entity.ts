@@ -8,10 +8,13 @@ import {
   DeleteDateColumn,
   Entity,
   Index,
+  JoinColumn,
   ManyToOne,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { FileEntity } from 'src/files/file.entity';
 
 @Entity({
   name: 'tenant',
@@ -111,20 +114,20 @@ export class TenantEntity extends EntityRelationalHelper {
   issueLoc?: string;
 
   @ApiProperty({
-    type: String,
+    type: () => FileEntity,
     nullable: true,
-    required: false,
   })
-  @Column({ type: String, nullable: true })
-  frontIdCardImagePath?: string;
+  @OneToOne(() => FileEntity, { nullable: true })
+  @JoinColumn({ name: 'frontIdCardImageId' })
+  frontIdCardImage: FileEntity | null;
 
   @ApiProperty({
-    type: String,
+    type: () => FileEntity,
     nullable: true,
-    required: false,
   })
-  @Column({ type: String, nullable: true })
-  backIdCardImagePath?: string;
+  @OneToOne(() => FileEntity, { nullable: true })
+  @JoinColumn({ name: 'backIdCardImageId' })
+  backIdCardImage: FileEntity | null;
 
   @ApiProperty({
     type: String,

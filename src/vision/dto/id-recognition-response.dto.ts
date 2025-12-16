@@ -1,5 +1,5 @@
 export class IdRecognitionData {
-  id: string;
+  citizenId: string;
   name: string;
   dob: string;
   sex: string;

@@ -9,23 +9,32 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   Request,
+  UploadedFile,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiCreatedResponse, ApiTags } from '@nestjs/swagger';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiCreatedResponse,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   PaginatedResponseDto,
   PaginationInfoResponseDto,
 } from 'src/utils/dto/paginated-response.dto';
 import { CreateTenantDto } from './dto/create-tenant.dto';
-import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { GetTenantDto } from './dto/get-tenant.dto';
-import { TenantService } from './tenant.service';
+import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { TenantEntity } from './tenant.entity';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { TenantService } from './tenant.service';
 
 @ApiBearerAuth()
 @ApiTags('tenant')
@@ -83,10 +92,13 @@ export class TenantController {
     return this.tenantService.update(id, body, request.user);
   }
 
+  @ApiTags('Tenants')
   @ApiCreatedResponse({
+    description: 'Upload tenant ID card images (front and/or back)',
     type: TenantEntity,
   })
-  @Post(':id/upload-id-card')
+  @ApiConsumes('multipart/form-data')
+  @Post(':roomId/upload-id-card')
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'frontImage', maxCount: 1 },
@@ -94,15 +106,62 @@ export class TenantController {
     ]),
   )
   @HttpCode(HttpStatus.OK)
+  @ApiParam({
+    name: 'roomId',
+    type: String,
+    required: true,
+    description: 'Room ID where the tenant belongs',
+  })
+  @ApiBody({
+    description: 'Tenant ID (optional) and ID card images',
+    schema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          nullable: true,
+          description: 'Existing tenant ID (omit to create new tenant)',
+          example: 'c4c4d5a1-7b02-4d23-a6f9-xxxx',
+        },
+        frontImage: {
+          type: 'string',
+          format: 'binary',
+          description: 'Front side of citizen ID card',
+        },
+        backImage: {
+          type: 'string',
+          format: 'binary',
+          description: 'Back side of citizen ID card',
+        },
+      },
+      required: [],
+    },
+  })
   uploadIdCard(
-    @Param('id') id: string,
+    @Param('roomId') roomId: string,
+
+    @Body()
+    body: {
+      id?: string;
+    },
+
     @UploadedFiles()
     files: {
       frontImage?: Express.Multer.File[];
       backImage?: Express.Multer.File[];
     },
+
+    @Req() request: any,
   ): Promise<TenantEntity> {
-    return this.tenantService.uploadIdCard(id, files);
+    return this.tenantService.uploadIdCard(
+      roomId,
+      {
+        frontImage: files.frontImage?.[0],
+        backImage: files.backImage?.[0],
+      },
+      request.user,
+      body.id,
+    );
   }
 
   @ApiCreatedResponse({

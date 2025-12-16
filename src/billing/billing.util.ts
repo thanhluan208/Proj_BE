@@ -107,21 +107,12 @@ export const generateBillingExcel = async (
   const subtotalLabel = i18nService.t('billing.summary.subtotal', {
     lang,
   });
-  const previousBalanceLabel = i18nService.t(
-    'billing.summary.previousBalance',
-    { lang },
-  );
+
   const totalAmountDueLabel = i18nService.t('billing.summary.totalAmountDue', {
     lang,
   });
 
   const notesLabel = i18nService.t('billing.notes', { lang });
-  const thankYouText = i18nService.t('billing.footer.thankYou', {
-    lang,
-  });
-  const paymentReminderText = i18nService.t('billing.footer.paymentReminder', {
-    lang,
-  });
 
   const nameLabel = i18nService.t('billing.landlord.name', { lang });
   const addressLabel = i18nService.t('billing.landlord.address', {
@@ -175,23 +166,6 @@ export const generateBillingExcel = async (
   let currentRow = 1;
 
   // ========== HEADER SECTION ==========
-  //   worksheet.mergeCells(`A${currentRow}:B${currentRow + 2}`);
-  //   const logoCell = worksheet.getCell(`A${currentRow}`);
-  //   logoCell.value = 'LOGO';
-  //   logoCell.font = { size: 20, bold: true, color: { argb: 'FF4472C4' } };
-  //   logoCell.alignment = { vertical: 'middle', horizontal: 'center' };
-  //   logoCell.fill = {
-  //     type: 'pattern',
-  //     pattern: 'solid',
-  //     fgColor: { argb: 'FFE7F0FF' },
-  //   };
-  //   logoCell.border = {
-  //     top: { style: 'thin' },
-  //     left: { style: 'thin' },
-  //     bottom: { style: 'thin' },
-  //     right: { style: 'thin' },
-  //   };
-
   worksheet.mergeCells(`A${currentRow}:F${currentRow + 2}`);
   const titleCell = worksheet.getCell(`A${currentRow}`);
   titleCell.value = invoiceTitle;
@@ -277,7 +251,7 @@ export const generateBillingExcel = async (
   const invoiceDetails = [
     [invoiceNoLabel, `${room.name}-${dayjs(data.from).format('YYYY-MM')}`],
     [invoiceDateLabel, dayjs(data.from).format('DD/MM/YYYY')],
-    [dueDateLabel, dayjs(data.to).add(5, 'day').format('DD/MM/YYYY')],
+    [dueDateLabel, dayjs(data.from).subtract(5, 'day').format('DD/MM/YYYY')],
     [
       billingPeriodLabel,
       `${dayjs(data.from).format('DD/MM/YYYY')} - ${dayjs(data.to).format('DD/MM/YYYY')}`,

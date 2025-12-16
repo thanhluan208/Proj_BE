@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   HttpStatus,
   Injectable,
   Logger,
@@ -22,134 +23,130 @@ import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { TenantEntity } from './tenant.entity';
 import { TenantHelper } from './tenant.helper';
 import { TenantRepository } from './tenant.repository';
+import { HouseEntity } from 'src/houses/house.entity';
+import dayjs from 'dayjs';
+import { randomUUID } from 'crypto';
+import { DataSource, EntityManager } from 'typeorm';
 
 @Injectable()
 export class TenantService {
   private readonly logger = new Logger(TenantService.name);
 
   constructor(
-    private housesService: HousesService,
-    private roomsService: RoomsService,
-    private usersService: UserService,
-    private tenantRepository: TenantRepository,
-    private visionService: VisionService,
-    private filesService: FilesService,
+    private readonly housesService: HousesService,
+    private readonly roomsService: RoomsService,
+    private readonly usersService: UserService,
+    private readonly tenantRepository: TenantRepository,
+    private readonly visionService: VisionService,
+    private readonly filesService: FilesService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async uploadIdCard(
-    tenantId: string,
+    roomId: string,
     files: {
-      frontImage?: Express.Multer.File[];
-      backImage?: Express.Multer.File[];
+      frontImage?: Express.Multer.File;
+      backImage?: Express.Multer.File;
     },
+    user: JwtPayloadType,
+    tenantId?: string,
   ) {
-    const tenant = await this.tenantRepository.findById(tenantId);
-    if (!tenant) {
-      throw new UnprocessableEntityException({
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-        errors: {
-          tenant: 'tenantNotFound',
-        },
+    const LOG_PREFIX = '[TENANT_UPLOAD_ID]';
+
+    this.logger.log(
+      `${LOG_PREFIX} Start upload ID card | roomId=${roomId}, tenantId=${tenantId ?? 'NEW'}, userId=${user.id}`,
+    );
+
+    if (!files.frontImage && !files.backImage) {
+      this.logger.warn(`${LOG_PREFIX} No images provided`);
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Either front or back image of citizenID is required',
       });
     }
 
-    // Ensure room and house are loaded for path construction
-    // If tenant.room or tenant.room.house is missing, we might need to fetch them.
-    // Assuming findById loads relations or we fetch them here.
-    // Based on repository, findById might not load deep relations.
-    // Let's fetch the room and house to be sure.
-    const room = await this.roomsService.findById(
-      tenant.room.id,
-      tenant.room.house.owner.id,
-    ); // This might be tricky if we don't have owner ID easily.
-    // Actually, let's just use the IDs we have if they are available in the tenant object.
-    // If tenant.room is just an ID, we need to fetch.
-    // Let's assume for now we can construct the path from what we have or fetch if needed.
-    // To be safe and correct, let's fetch the full tenant with relations if needed, or just rely on the IDs if they are present.
-    // The tenant entity definition shows ManyToOne, so they should be there if eager or joined.
-    // TenantRepository.findById uses findOne, which usually doesn't load relations unless specified.
-    // Let's check TenantRepository.findById again.
-    // It just does findOne({ where: { id } }).
-    // We should probably update findById to load relations or use a query builder here.
-    // For now, let's assume we need to fetch the room and house.
+    let tenant = new TenantEntity();
 
-    // Wait, I can just use the IDs if I trust the structure.
-    // But to be safe, I'll use the IDs from the tenant object if they exist.
-    // If not, I might need to fetch.
-    // Let's assume tenant.room and tenant.room.house are loaded.
-    // If not, I'll need to fix TenantRepository.findById or do a separate fetch.
+    if (tenantId) {
+      this.logger.log(`${LOG_PREFIX} Fetching tenant ${tenantId}`);
+      const existingTenant = await this.tenantRepository.findById(tenantId, [
+        'room',
+        'room.house',
+        'room.house.owner',
+      ]);
 
-    // Actually, looking at TenantRepository.findById:
-    // return await this.tenantRepository.findOne({ where: { id } });
-    // This will NOT load relations by default unless eager: true is set in Entity.
-    // Let's check TenantEntity.
+      if (!existingTenant) {
+        this.logger.warn(
+          `${LOG_PREFIX} Tenant not found | tenantId=${tenantId}`,
+        );
+        throw new BadRequestException({
+          status: HttpStatus.BAD_REQUEST,
+          message: 'Tenant not found',
+        });
+      }
 
-    // TenantEntity:
-    // @ManyToOne(() => RoomEntity, { eager: true })
-    // room: RoomEntity;
-
-    // RoomEntity:
-    // @ManyToOne(() => HouseEntity, { eager: true })
-    // house: HouseEntity;
-
-    // So relations ARE loaded eagerly! Great.
-
-    const houseId = tenant.room.house.id;
-    const roomId = tenant.room.id;
-
-    const frontImage = files.frontImage?.[0];
-    const backImage = files.backImage?.[0];
-
-    if (frontImage) {
-      // 1. Extract info from front image
-      const frontInfo = await this.visionService.recognizeId(frontImage);
-      const data = frontInfo.data[0];
-
-      // 2. Update tenant info
-      tenant.citizenId = data.id !== 'N/A' ? data.id : tenant.citizenId;
-      tenant.name = data.name !== 'N/A' ? data.name : tenant.name;
-      tenant.dob =
-        data.dob !== 'N/A'
-          ? new Date(data.dob.split('/').reverse().join('-'))
-          : tenant.dob;
-      tenant.sex = data.sex !== 'N/A' ? data.sex : tenant.sex;
-      tenant.nationality =
-        data.nationality !== 'N/A' ? data.nationality : tenant.nationality;
-      tenant.home = data.home !== 'N/A' ? data.home : tenant.home;
-      tenant.address = data.address !== 'N/A' ? data.address : tenant.address;
-
-      // 3. Upload image
-      const path = `${houseId}/${roomId}/${tenant.id}/${tenant.id}_front-ID`;
-      const uploadedFile = await this.filesService.uploadFileWithCustomPath(
-        frontImage,
-        path,
-      );
-      tenant.frontIdCardImagePath = uploadedFile.path;
+      tenant = existingTenant;
+    } else {
+      tenant.id = randomUUID();
     }
 
-    if (backImage) {
-      // 1. Extract info from back image
-      const backInfo = await this.visionService.recognizeIdBack(backImage);
-      const data = backInfo.data[0];
-
-      // 2. Update tenant info
-      tenant.issueDate =
-        data.issueDate !== 'N/A'
-          ? new Date(data.issueDate.split('/').reverse().join('-'))
-          : tenant.issueDate;
-      tenant.issueLoc =
-        data.issueLoc !== 'N/A' ? data.issueLoc : tenant.issueLoc;
-
-      // 3. Upload image
-      const path = `${houseId}/${roomId}/${tenant.id}/${tenant.id}_back-ID`;
-      const uploadedFile = await this.filesService.uploadFileWithCustomPath(
-        backImage,
-        path,
-      );
-      tenant.backIdCardImagePath = uploadedFile.path;
+    const room = await this.roomsService.findById(roomId, user.id);
+    if (!room) {
+      this.logger.warn(`${LOG_PREFIX} Room not found | roomId=${roomId}`);
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: { room: 'roomNotFound' },
+      });
     }
 
-    return this.tenantRepository.save(tenant);
+    if (tenantId && tenant.room?.id !== room.id) {
+      this.logger.warn(
+        `${LOG_PREFIX} Tenant does not belong to room | tenantRoomId=${tenant.room?.id}, roomId=${room.id}`,
+      );
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: `This tenant does not exist in room ${room.name}`,
+      });
+    }
+
+    tenant.room = room;
+    const tenantStatus = new StatusEntity();
+    tenantStatus.id = StatusEnum.active;
+
+    tenant.status = tenantStatus;
+
+    const filePath = `${user.id}/${room.house.id}/${room.id}/${tenant.id}/ID/`;
+
+    return this.dataSource.transaction(async (manager) => {
+      /** ---------- FRONT IMAGE ---------- */
+      await this.processFrontImageID({
+        filePath,
+        manager,
+        tenant,
+        tenantId,
+        image: files.frontImage,
+      });
+
+      /** ---------- BACK IMAGE ---------- */
+      await this.processBackImageID({
+        filePath,
+        manager,
+        tenant,
+        hasFrontImage: !!files.frontImage,
+        image: files.backImage,
+        tenantId,
+      });
+
+      this.logger.log(`${LOG_PREFIX} Uploading ${tenant.toJSON()}`);
+
+      const savedTenant = await this.tenantRepository.save(tenant);
+
+      this.logger.log(
+        `${LOG_PREFIX} Upload completed successfully | tenantId=${savedTenant.id}`,
+      );
+
+      return savedTenant;
+    });
   }
 
   async create(
@@ -467,5 +464,138 @@ export class TenantService {
     this.logger.log(`Tenant ${tenantId} soft deleted successfully`);
 
     return { success: true, message: 'Tenant deleted successfully' };
+  }
+
+  async processFrontImageID({
+    filePath,
+    image,
+    manager,
+    tenant,
+    tenantId,
+  }: {
+    image?: Express.Multer.File;
+    tenantId?: string;
+    filePath: string;
+    tenant: TenantEntity;
+    manager: EntityManager;
+  }) {
+    const LOG_PREFIX = '[TENANT_UPLOAD_ID]';
+    if (!image) return;
+
+    this.logger.log(`${LOG_PREFIX} Processing front ID image`);
+
+    const frontInfo = await this.visionService.recognizeId(image);
+    const frontData = frontInfo?.data?.[0];
+
+    if (!frontData?.name && !tenantId) {
+      this.logger.warn(
+        `${LOG_PREFIX} OCR failed to extract name from front ID`,
+      );
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Failed to extract info from uploaded images.',
+      });
+    }
+
+    const frontFileName = `${frontData?.name ?? tenant.name}-front`;
+
+    const uploadedFrontFile = await this.filesService.uploadFileWithCustomPath(
+      image,
+      filePath + frontFileName,
+    );
+
+    manager.save(uploadedFrontFile.file);
+
+    if (!uploadedFrontFile?.file) {
+      this.logger.error(`${LOG_PREFIX} Failed to upload front ID image`);
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Failed to upload file',
+      });
+    }
+
+    Object.entries(frontData || {}).forEach(([key, value]) => {
+      if (value && value !== 'N/A') {
+        tenant[key] =
+          key === 'dob' ? dayjs(value, 'DD/MM/YYYY').toDate() : value;
+      }
+    });
+
+    tenant.frontIdCardImage = uploadedFrontFile.file;
+
+    if (tenant.citizenId) {
+      const existTenantWithID = await this.tenantRepository.findByCitizenID(
+        tenant.citizenId,
+      );
+
+      if (existTenantWithID && existTenantWithID.id !== tenant.id) {
+        throw new BadRequestException({
+          status: HttpStatus.BAD_REQUEST,
+          message: 'A tenant with this citizenID is already exist!',
+        });
+      }
+    }
+  }
+
+  async processBackImageID({
+    filePath,
+    manager,
+    tenant,
+    image,
+    tenantId,
+    hasFrontImage,
+  }: {
+    image?: Express.Multer.File;
+    tenantId?: string;
+    filePath: string;
+    hasFrontImage?: boolean;
+    tenant: TenantEntity;
+    manager: EntityManager;
+  }) {
+    const LOG_PREFIX = '[TENANT_UPLOAD_ID]';
+
+    if (!image) return;
+
+    this.logger.log(`${LOG_PREFIX} Processing back ID image`);
+
+    if (!tenantId && !hasFrontImage) {
+      this.logger.warn(
+        `${LOG_PREFIX} Back image provided without front image for new tenant`,
+      );
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Front ID image is required when uploading back image',
+      });
+    }
+
+    const backInfo = await this.visionService.recognizeIdBack(image);
+    const backData = backInfo?.data?.[0];
+
+    const backFileName = `${tenant.name}-back`;
+
+    const uploadedBackFile = await this.filesService.uploadFileWithCustomPath(
+      image,
+      filePath + backFileName,
+    );
+
+    manager.save(uploadedBackFile.file);
+
+    if (!uploadedBackFile?.file) {
+      this.logger.error(`${LOG_PREFIX} Failed to upload back ID image`);
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Failed to upload file',
+      });
+    }
+
+    tenant.issueDate =
+      backData?.issueDate && backData.issueDate !== 'N/A'
+        ? dayjs(backData.issueDate, 'DD/MM/YYYY').toDate()
+        : undefined;
+
+    tenant.issueLoc =
+      backData?.issueLoc !== 'N/A' ? backData?.issueLoc : undefined;
+
+    tenant.backIdCardImage = uploadedBackFile.file;
   }
 }

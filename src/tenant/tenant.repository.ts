@@ -15,6 +15,14 @@ export class TenantRepository {
     return await this.tenantRepository.save(newEntity);
   }
 
+  async findByCitizenID(citizenId: string) {
+    return this.tenantRepository.findOne({
+      where: {
+        citizenId,
+      },
+    });
+  }
+
   async findById(
     id: string,
     relations?: string[],
