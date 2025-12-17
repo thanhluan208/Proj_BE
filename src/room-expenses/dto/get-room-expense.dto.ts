@@ -58,6 +58,15 @@ export class GetRoomExpensesDto extends PaginationDto {
   search?: string;
 
   @ApiPropertyOptional({
+    type: String,
+    example: 'Asset handed over',
+    description: 'Filter by asset handed over',
+  })
+  @IsOptional()
+  @IsString()
+  isAssetHandedOver?: string;
+
+  @ApiPropertyOptional({
     type: Number,
     example: 1000,
     description: 'Filter by amount',

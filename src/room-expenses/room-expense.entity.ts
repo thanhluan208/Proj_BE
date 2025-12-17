@@ -52,6 +52,13 @@ export class RoomExpenseEntity extends EntityRelationalHelper {
   notes: string | null;
 
   @ApiProperty({
+    type: Boolean,
+    example: 'Is Asset Handed Over',
+  })
+  @Column({ type: 'boolean' })
+  isAssetHandedOver: boolean;
+
+  @ApiProperty({
     type: () => FileEntity,
     nullable: true,
   })

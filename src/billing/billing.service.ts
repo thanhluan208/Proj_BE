@@ -10,22 +10,21 @@ import { RoomEntity } from 'src/rooms/room.entity';
 import { RoomsService } from 'src/rooms/rooms.service';
 import { StatusEnum } from 'src/statuses/statuses.enum';
 import { TenantContractsService } from 'src/tenant-contracts/tenant-contracts.service';
-import { BillingStatusEnum } from './billing-status.enum';
+import { BillingStatusEnum, BillingTypeEnum } from './billing-status.enum';
 import { BillingRepository } from './billing.repository';
 import { CreateBillingDto } from './dto/create-billing.dto';
 import { PayBillingDto } from './dto/pay-billing.dto';
 
-import dayjs from 'dayjs';
-import { I18nContext, I18nService } from 'nestjs-i18n';
-import * as path from 'path';
-import { FilesService } from 'src/files/files.service';
-import { generateBillingExcel, UltilityDetail } from './billing.util';
-import { REDIS_PREFIX_KEY } from 'src/utils/constant';
 import { createHash } from 'crypto';
-import { BillingSortField, GetBillingDto } from './dto/get-billing.dto';
-import { BillingEntity } from './billing.entity';
+import dayjs from 'dayjs';
+import { I18nService } from 'nestjs-i18n';
 import { FileEntity } from 'src/files/file.entity';
+import { FilesService } from 'src/files/files.service';
+import { REDIS_PREFIX_KEY } from 'src/utils/constant';
 import { SortOrder } from 'src/utils/types/common.type';
+import { BillingEntity } from './billing.entity';
+import { calculateBillCost, generateBillingExcel } from './billing.util';
+import { BillingSortField, GetBillingDto } from './dto/get-billing.dto';
 
 @Injectable()
 export class BillingService {
@@ -47,6 +46,35 @@ export class BillingService {
   ) {}
 
   async create(dto: CreateBillingDto, user: JwtPayloadType) {
+    const indexesProvided =
+      dto.electricity_start_index != null ||
+      dto.electricity_end_index != null ||
+      dto.water_start_index != null ||
+      dto.water_end_index != null;
+
+    this.logger.log({ dto, indexesProvided });
+
+    if (dto.type !== BillingTypeEnum.USAGE_BASED && indexesProvided) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: `Recurring type of bill should not include indexes info.`,
+      });
+    }
+
+    const isDuplicate = await this.repository.findDuplicateBill(
+      dto.roomId,
+      dto.type,
+      dto.from,
+      dto.to,
+    );
+
+    if (isDuplicate) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'A bill of this type already exists for this month range.',
+      });
+    }
+
     const { currentTenantContract, file, totalAmount } =
       await this.generateBill(dto, user);
 
@@ -64,9 +92,12 @@ export class BillingService {
       water_start_index: dto.water_start_index,
       electricity_end_index: dto.electricity_end_index,
       electricity_start_index: dto.electricity_start_index,
+      type: dto.type,
     });
 
-    this.redisService.incr(`${this.CACHE_BILLING_VERSION_KEY}:${user.id}`);
+    await this.redisService.incr(
+      `${this.CACHE_BILLING_VERSION_KEY}:${user.id}`,
+    );
 
     return newBill;
   }
@@ -160,7 +191,7 @@ export class BillingService {
 
     if (file) {
       const fileName = `proof-${targetBill.id}-${dayjs().format('DD_MM_YYYY_HH_mm_ss')}`;
-      const filePath = `${user.id}/${room.house.id}/${room.id}/billing/${dayjs(targetBill.from).format('MM-YYYY')}/${fileName}`;
+      const filePath = `${user.id}/${room.house.name}/${room.name}/billing/${dayjs(targetBill.from).format('MM-YYYY')}/${fileName}`;
 
       const uploadedFile = await this.fileService.uploadFileWithCustomPath(
         file,
@@ -184,7 +215,7 @@ export class BillingService {
       `${this.CACHE_BILLING_VERSION_KEY}:${user.id}`,
     );
 
-    return targetBill;
+    return result;
   }
 
   async download(id: string, user: JwtPayloadType) {
@@ -227,7 +258,6 @@ export class BillingService {
 
   async generateBill(dto: CreateBillingDto, user: JwtPayloadType) {
     const { roomId } = dto;
-    const lang = I18nContext.current()?.lang;
 
     const room = await this.roomService.findById(roomId, user.id, [
       'contracts',
@@ -268,151 +298,17 @@ export class BillingService {
     const { contract, tenant } = currentTenantContract;
 
     // 3. Calculate Costs
-    const electricityUsage =
-      dto.electricity_end_index - dto.electricity_start_index;
-    const waterUsage = dto.water_end_index - dto.water_start_index;
-
-    if (electricityUsage < 0 || waterUsage < 0) {
-      throw new BadRequestException({
-        status: HttpStatus.BAD_REQUEST,
-        errors: {
-          index: 'endIndexMustBeGreaterThanStartIndex',
-        },
-      });
-    }
-
-    const totalElectricityCost =
-      Number(contract.fixed_electricity_fee) > 0
-        ? Number(contract.fixed_electricity_fee)
-        : electricityUsage * Number(contract.price_per_electricity_unit);
-
-    const totalWaterCost =
-      Number(contract.fixed_water_fee) > 0
-        ? Number(contract.fixed_water_fee)
-        : waterUsage * Number(contract.price_per_water_unit);
-
-    const totalAmount =
-      Number(contract.base_rent) +
-      totalElectricityCost +
-      totalWaterCost +
-      Number(contract.internet_fee) +
-      Number(contract.living_fee) +
-      Number(contract.parking_fee) +
-      Number(contract.cleaning_fee);
-
-    let utilityDetails: UltilityDetail | null = null;
-
-    if (Number(contract.price_per_electricity_unit) > 0) {
-      utilityDetails = {
-        electric_end_index: dto.electricity_end_index,
-        electric_price_unit: contract.price_per_electricity_unit,
-        electric_start_index: dto.electricity_start_index,
-      };
-    }
-
-    if (Number(contract.price_per_water_unit) > 0) {
-      const waterUltility = {
-        water_start_index: dto.water_start_index,
-        water_end_index: dto.water_end_index,
-        water_price_unit: contract.price_per_water_unit,
-      };
-      utilityDetails = {
-        ...utilityDetails,
-        ...waterUltility,
-      };
-    }
-
-    const billingItems = [
-      {
-        description: this.i18nService.t('billing.monthlyRent', { lang }),
-        quantity: 1,
-        unitPrice: contract.base_rent,
-        amount: contract.base_rent,
-      },
-      {
-        description: this.i18nService.t('billing.electricity', { lang }),
-        quantity: Number(contract.fixed_electricity_fee) ? 1 : electricityUsage,
-        unitPrice: Number(contract.fixed_electricity_fee)
-          ? contract.fixed_electricity_fee
-          : contract.price_per_electricity_unit,
-        amount: totalElectricityCost,
-      },
-      {
-        description: this.i18nService.t('billing.water', { lang }),
-        quantity: Number(contract.fixed_water_fee) ? 1 : waterUsage,
-        unitPrice: Number(contract.fixed_water_fee)
-          ? contract.fixed_water_fee
-          : contract.price_per_water_unit,
-        amount: totalWaterCost,
-      },
-    ];
-
-    if (contract.internet_fee) {
-      billingItems.push({
-        description: this.i18nService.t('billing.internetFee', { lang }),
-        quantity: 1,
-        unitPrice: contract.internet_fee,
-        amount: contract.internet_fee,
-      });
-    }
-
-    if (contract.cleaning_fee) {
-      billingItems.push({
-        description: this.i18nService.t('billing.cleaningFee', { lang }),
-        quantity: 1,
-        unitPrice: contract.cleaning_fee,
-        amount: contract.cleaning_fee,
-      });
-    }
-
-    if (contract.living_fee) {
-      billingItems.push({
-        description: this.i18nService.t('billing.livingFee', { lang }),
-        quantity: 1,
-        unitPrice: contract.living_fee,
-        amount: contract.living_fee,
-      });
-    }
-
-    if (contract.parking_fee) {
-      billingItems.push({
-        description: this.i18nService.t('billing.parkingFee', { lang }),
-        quantity: 1,
-        unitPrice: contract.parking_fee,
-        amount: contract.parking_fee,
-      });
-    }
-
-    // if (contract.overRentalFee) {
-    //   billingItems.push({
-    //     description: this.i18nService.t('billing.overRentalFee', { lang }),
-    //     quantity: 1,
-    //     unitPrice: Number(contract.overRentalFee),
-    //     amount: Number(contract.overRentalFee),
-    //   });
-    // }
-
-    const houseInfo: CreateBillingDto['houseInfo'] = {
-      ...dto.houseInfo,
-      houseAddress: room.house.address,
-      houseOwner: room.house.owner.bankName,
-      houseOwnerPhoneNumber: room.house.owner.phoneNumber,
-    };
-
-    const bankInfo: CreateBillingDto['bankInfo'] = {
-      ...dto.bankInfo,
-      bankAccountName: room.house.owner.bankAccountName,
-      bankAccountNumber: room.house.owner.bankAccountNumber,
-      bankName: room.house.owner.bankName,
-    };
+    const { billingItems, totalAmount, utilityDetails } = calculateBillCost(
+      dto,
+      contract,
+      this.i18nService,
+    );
 
     const buffer = await generateBillingExcel(
       {
         room,
         contract,
         tenant,
-        bankInfo: bankInfo,
-        houseInfo: houseInfo,
         from: dto.from,
         to: dto.to,
         notes: dto.notes,
@@ -422,8 +318,8 @@ export class BillingService {
       },
       this.i18nService,
     );
-    const fileName = `invoice-${room.name}-${Date.now()}.xlsx`;
-    const filePath = `${user.id}/${room.house.id}/${room.id}/billing/${dayjs(dto.from).format('MM-YYYY')}/${fileName}`;
+    const fileName = `invoice-${dto.type}.xlsx`;
+    const filePath = `${user.id}/${room.house.name}/${room.name}/billing/${dayjs(dto.from).format('MM-YYYY')}/${fileName}`;
 
     const file = await this.fileService.uploadBufferWithCustomPath(
       buffer,
@@ -498,8 +394,6 @@ export class BillingService {
   async getBillsByRoom(dto: GetBillingDto, user: JwtPayloadType) {
     const { room: roomId, sortBy, sortOrder, ...options } = dto;
     const userId = user.id;
-
-    console.log('dtodtodtodtodto', dto);
 
     const cacheVersion = await this.getCacheVersion(user.id);
 

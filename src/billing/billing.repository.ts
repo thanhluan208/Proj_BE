@@ -64,6 +64,7 @@ export class BillingRepository {
       from?: Date;
       to?: Date;
       status?: string;
+      type?: string;
       isCounting?: boolean;
       sortBy?: BillingSortField;
       sortOrder?: SortOrder;
@@ -78,6 +79,7 @@ export class BillingRepository {
       from,
       to,
       status,
+      type,
       isCounting = false,
       sortBy,
       sortOrder = 'DESC',
@@ -96,6 +98,9 @@ export class BillingRepository {
     // ---------- Optional filters ----------
     if (status) {
       query.andWhere('billing.status = :status', { status });
+    }
+    if (type) {
+      query.andWhere('billing.type = :type', { type });
     }
 
     if (from) {
@@ -144,8 +149,6 @@ export class BillingRepository {
 
     const primaryOrder = sortOrder;
 
-    console.log('primarySortprimarySortprimarySortprimarySort', primarySort);
-
     query.orderBy(primarySort, primaryOrder);
 
     if (primarySort !== 'billing.createdAt') {
@@ -167,5 +170,36 @@ export class BillingRepository {
   async softDelete(id: string): Promise<boolean> {
     const result = await this.repository.softDelete(id);
     return (result.affected ?? 0) > 0;
+  }
+
+  async findDuplicateBill(
+    roomId: string,
+    type: string,
+    from: Date,
+    to: Date,
+  ): Promise<boolean> {
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+
+    const count = await this.repository
+      .createQueryBuilder('billing')
+      .leftJoin('billing.room', 'room')
+      .where('room.id = :roomId', { roomId })
+      .andWhere('billing.type = :type', { type })
+      .andWhere('EXTRACT(MONTH FROM billing.from) = :fromMonth', {
+        fromMonth: fromDate.getMonth() + 1,
+      })
+      .andWhere('EXTRACT(YEAR FROM billing.from) = :fromYear', {
+        fromYear: fromDate.getFullYear(),
+      })
+      .andWhere('EXTRACT(MONTH FROM billing.to) = :toMonth', {
+        toMonth: toDate.getMonth() + 1,
+      })
+      .andWhere('EXTRACT(YEAR FROM billing.to) = :toYear', {
+        toYear: toDate.getFullYear(),
+      })
+      .getCount();
+
+    return count > 0;
   }
 }

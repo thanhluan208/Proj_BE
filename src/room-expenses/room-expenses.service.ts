@@ -47,8 +47,6 @@ export class RoomExpensesService {
       });
     }
 
-    const uploadFileQueue: (Promise<{ file: FileEntity }> | undefined)[] = [];
-
     const expenses = JSON.parse(expensesRaw) as Expense[];
 
     let fileIndex = 0;
@@ -62,6 +60,7 @@ export class RoomExpensesService {
             room,
             name: elm.name,
             amount: elm.amount,
+            isAssetHandedOver: elm.isAssetHandedOver,
             date: elm.date,
             notes: elm.notes,
             receipt: (
@@ -79,6 +78,7 @@ export class RoomExpensesService {
           return {
             room,
             name: elm.name,
+            isAssetHandedOver: elm.isAssetHandedOver,
             amount: elm.amount,
             date: elm.date,
             notes: elm.notes,
@@ -86,8 +86,6 @@ export class RoomExpensesService {
         }
       }),
     );
-
-    const files = await Promise.all(uploadFileQueue);
 
     this.redisService.incr(
       `${this.CACHE_ROOM_EXPENSE_VERSION_KEY}:${user.id}:${room.id}`,
@@ -140,6 +138,7 @@ export class RoomExpensesService {
     return await this.expenseRepository.update(id, {
       ...current,
       room,
+      isAssetHandedOver: payload.isAssetHandedOver,
       name: payload.name,
       amount: payload.amount,
       date: payload.date,
@@ -207,6 +206,7 @@ export class RoomExpensesService {
       comparison: payload.comparison,
       sortBy: payload.sortBy,
       sortOrder: payload.sortOrder,
+      isAssetHandedOver: payload.isAssetHandedOver,
     };
     const filterHash = createHash('sha256')
       .update(JSON.stringify(filters))
@@ -240,6 +240,7 @@ export class RoomExpensesService {
         comparison: payload.comparison,
         sortBy: payload.sortBy,
         sortOrder: payload.sortOrder,
+        isAssetHandedOver: payload.isAssetHandedOver,
       });
 
       if (expenses.length > 0 && expenses?.length === pageSize) {

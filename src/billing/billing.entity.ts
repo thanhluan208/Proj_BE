@@ -13,7 +13,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { BillingStatusEnum } from './billing-status.enum';
+import { BillingStatusEnum, BillingTypeEnum } from './billing-status.enum';
 import { TenantContractEntity } from 'src/tenant-contracts/tenant-contracts.entity';
 import { FileEntity } from 'src/files/file.entity';
 
@@ -70,32 +70,32 @@ export class BillingEntity extends EntityRelationalHelper {
     example: 100,
     nullable: true,
   })
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
-  electricity_start_index: number;
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  electricity_start_index?: number;
 
   @ApiProperty({
     type: Number,
     example: 150,
     nullable: true,
   })
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
-  electricity_end_index: number;
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  electricity_end_index?: number;
 
   @ApiProperty({
     type: Number,
     example: 50,
     nullable: true,
   })
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
-  water_start_index: number;
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  water_start_index?: number;
 
   @ApiProperty({
     type: Number,
     example: 60,
     nullable: true,
   })
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
-  water_end_index: number;
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  water_end_index?: number;
 
   @ApiProperty({
     type: Number,
@@ -114,6 +114,17 @@ export class BillingEntity extends EntityRelationalHelper {
     default: BillingStatusEnum.PENDING_OWNER_REVIEW,
   })
   status: BillingStatusEnum;
+
+  @ApiProperty({
+    enum: BillingStatusEnum,
+    example: BillingStatusEnum.PENDING_TENANT_PAYMENT,
+  })
+  @Column({
+    type: 'enum',
+    enum: BillingTypeEnum,
+    default: BillingTypeEnum.RECURRING,
+  })
+  type: BillingTypeEnum;
 
   @ApiProperty({
     type: Date,

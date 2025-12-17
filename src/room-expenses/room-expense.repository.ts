@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
 import { RoomExpenseEntity } from 'src/room-expenses/room-expense.entity';
-import { PaginationOptions } from 'src/utils/types/common.type';
+import { Repository } from 'typeorm';
 
 interface FindByRoomOptions {
   skip: number;
@@ -14,6 +13,7 @@ interface FindByRoomOptions {
   comparison?: 'bigger' | 'smaller';
   sortBy?: 'date' | 'amount' | 'name';
   sortOrder?: 'ASC' | 'DESC';
+  isAssetHandedOver?: string;
 }
 
 @Injectable()
@@ -54,6 +54,11 @@ export class RoomExpenseRepository {
     }
     if (options.to) {
       query.andWhere('expense.date <= :to', { to: options.to });
+    }
+    if (options.isAssetHandedOver) {
+      query.andWhere('expense.isAssetHandedOver = :isAssetHandedOver', {
+        isAssetHandedOver: Boolean(options.isAssetHandedOver),
+      });
     }
 
     // Search by name

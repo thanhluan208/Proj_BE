@@ -1,40 +1,11 @@
-import { I18nContext, I18nService } from 'nestjs-i18n';
-import * as ExcelJS from 'exceljs';
-import { CreateBillingDto } from './dto/create-billing.dto';
-import { ContractEntity } from 'src/contracts/contract.entity';
-import { TenantEntity } from 'src/tenant/tenant.entity';
+import { BadRequestException, HttpStatus } from '@nestjs/common';
 import dayjs from 'dayjs';
-import { RoomEntity } from 'src/rooms/room.entity';
-
-type Item = {
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  amount: number;
-};
-
-export type UltilityDetail = {
-  electric_start_index?: number;
-  electric_end_index?: number;
-  electric_price_unit?: number;
-  water_start_index?: number;
-  water_end_index?: number;
-  water_price_unit?: number;
-};
-
-interface GenerateBillingExcelData {
-  contract: ContractEntity;
-  tenant: TenantEntity;
-  room: RoomEntity;
-  from: Date;
-  to: Date;
-  bankInfo: CreateBillingDto['bankInfo'];
-  houseInfo: CreateBillingDto['houseInfo'];
-  items: Item[];
-  utilityDetails: UltilityDetail | null;
-  notes: string;
-  totalAmount: number;
-}
+import * as ExcelJS from 'exceljs';
+import { I18nContext, I18nService } from 'nestjs-i18n';
+import { ContractEntity } from 'src/contracts/contract.entity';
+import { GenerateBillingExcelData, Item, UltilityDetail } from './billing.type';
+import { CreateBillingDto } from './dto/create-billing.dto';
+import { BillingTypeEnum } from './billing-status.enum';
 
 const hasUtilityMeterReadings = (
   utilityDetails: UltilityDetail | null,
@@ -54,14 +25,216 @@ const hasUtilityMeterReadings = (
   return hasElectricMeters || hasWaterMeters;
 };
 
+const handleBillingItemConcurrent = (
+  i18nService: I18nService,
+  contract: ContractEntity,
+) => {
+  const lang = I18nContext.current()?.lang;
+  const isFixWater = Number(contract.fixed_water_fee) > 0;
+  const isFixElectric = Number(contract.fixed_electricity_fee) > 0;
+
+  const billingItems = [
+    {
+      description: i18nService.t('billing.monthlyRent', { lang }),
+      quantity: 1,
+      unitPrice: contract.base_rent,
+      amount: contract.base_rent,
+    },
+  ];
+
+  if (isFixElectric) {
+    billingItems.push({
+      description: i18nService.t('billing.electricity', { lang }),
+      quantity: 1,
+      unitPrice: contract.fixed_electricity_fee,
+      amount: contract.fixed_electricity_fee,
+    });
+  }
+  if (isFixWater) {
+    billingItems.push({
+      description: i18nService.t('billing.water', { lang }),
+      quantity: 1,
+      unitPrice: contract.fixed_water_fee,
+      amount: contract.fixed_water_fee,
+    });
+  }
+  if (contract.internet_fee) {
+    billingItems.push({
+      description: i18nService.t('billing.internetFee', { lang }),
+      quantity: 1,
+      unitPrice: contract.internet_fee,
+      amount: contract.internet_fee,
+    });
+  }
+  if (contract.cleaning_fee) {
+    billingItems.push({
+      description: i18nService.t('billing.cleaningFee', { lang }),
+      quantity: 1,
+      unitPrice: contract.cleaning_fee,
+      amount: contract.cleaning_fee,
+    });
+  }
+  if (contract.living_fee) {
+    billingItems.push({
+      description: i18nService.t('billing.livingFee', { lang }),
+      quantity: 1,
+      unitPrice: contract.living_fee,
+      amount: contract.living_fee,
+    });
+  }
+  if (contract.parking_fee) {
+    billingItems.push({
+      description: i18nService.t('billing.parkingFee', { lang }),
+      quantity: 1,
+      unitPrice: contract.parking_fee,
+      amount: contract.parking_fee,
+    });
+  }
+
+  return billingItems;
+};
+
+const handleBillingItemUsageBase = (
+  dto: CreateBillingDto,
+  i18nService: I18nService,
+  contract: ContractEntity,
+) => {
+  const lang = I18nContext.current()?.lang;
+  const isFixWater = Number(contract.fixed_water_fee) > 0;
+  const isFixElectric = Number(contract.fixed_electricity_fee) > 0;
+
+  const electricityUsage =
+    dto.electricity_end_index - dto.electricity_start_index;
+  const waterUsage = dto.water_end_index - dto.water_start_index;
+  const totalElectricityCost =
+    electricityUsage * Number(contract.price_per_electricity_unit);
+
+  const totalWaterCost = waterUsage * Number(contract.price_per_water_unit);
+
+  const billingItems: Item[] = [];
+
+  if (!isFixElectric) {
+    billingItems.push({
+      description: i18nService.t('billing.electricity', { lang }),
+      quantity: electricityUsage,
+      unitPrice: contract.price_per_electricity_unit,
+      amount: totalElectricityCost,
+    });
+  }
+  if (!isFixWater) {
+    billingItems.push({
+      description: i18nService.t('billing.water', { lang }),
+      quantity: waterUsage,
+      unitPrice: contract.price_per_water_unit,
+      amount: totalWaterCost,
+    });
+  }
+
+  return billingItems;
+};
+
+export const calculateBillCost = (
+  dto: CreateBillingDto,
+  contract: ContractEntity,
+  i18nService: I18nService,
+) => {
+  const isFixWater = Number(contract.fixed_water_fee) > 0;
+  const isFixElectric = Number(contract.fixed_electricity_fee) > 0;
+  const type = dto.type;
+
+  const electricityUsage =
+    dto.electricity_end_index - dto.electricity_start_index;
+  const waterUsage = dto.water_end_index - dto.water_start_index;
+
+  if (electricityUsage < 0 || waterUsage < 0) {
+    throw new BadRequestException({
+      status: HttpStatus.BAD_REQUEST,
+      errors: {
+        index: 'endIndexMustBeGreaterThanStartIndex',
+      },
+    });
+  }
+
+  const totalElectricityCost = isFixElectric
+    ? Number(contract.fixed_electricity_fee)
+    : electricityUsage * Number(contract.price_per_electricity_unit);
+
+  const totalWaterCost = isFixWater
+    ? Number(contract.fixed_water_fee)
+    : waterUsage * Number(contract.price_per_water_unit);
+
+  let totalAmount = 0;
+  let utilityDetails: UltilityDetail | null = null;
+
+  if (type === BillingTypeEnum.RECURRING) {
+    totalAmount =
+      Number(contract.base_rent) +
+      (isFixElectric ? totalElectricityCost : 0) +
+      (isFixWater ? totalWaterCost : 0) +
+      Number(contract.internet_fee) +
+      Number(contract.living_fee) +
+      Number(contract.parking_fee) +
+      Number(contract.cleaning_fee);
+  }
+  if (type === BillingTypeEnum.USAGE_BASED) {
+    totalAmount =
+      (isFixElectric ? 0 : totalElectricityCost) +
+      (isFixWater ? 0 : totalWaterCost);
+    if (!isFixElectric) {
+      utilityDetails = {
+        electric_end_index: dto.electricity_end_index,
+        electric_price_unit: contract.price_per_electricity_unit,
+        electric_start_index: dto.electricity_start_index,
+      };
+    }
+    if (!isFixWater) {
+      const waterUltility = {
+        water_start_index: dto.water_start_index,
+        water_end_index: dto.water_end_index,
+        water_price_unit: contract.price_per_water_unit,
+      };
+      utilityDetails = {
+        ...utilityDetails,
+        ...waterUltility,
+      };
+    }
+  }
+
+  let billingItems: Item[] = [];
+
+  if (dto.type === BillingTypeEnum.RECURRING) {
+    billingItems = handleBillingItemConcurrent(i18nService, contract);
+  }
+  if (dto.type === BillingTypeEnum.USAGE_BASED) {
+    console.log('handleBillingItemUsageBase', contract);
+    billingItems = handleBillingItemUsageBase(dto, i18nService, contract);
+    console.log('handleBillingItemUsageBase', billingItems);
+  }
+
+  return {
+    utilityDetails,
+    billingItems,
+    totalAmount,
+  };
+};
+
 export const generateBillingExcel = async (
   data: GenerateBillingExcelData,
   i18nService: I18nService,
 ): Promise<Buffer> => {
   const lang = I18nContext.current()?.lang;
 
-  const { bankInfo, houseInfo, totalAmount, room, tenant, utilityDetails } =
-    data;
+  const { totalAmount, room, tenant, utilityDetails } = data;
+  const houseInfo = {
+    houseAddress: room.house.address,
+    houseOwner: room.house.owner.bankName,
+    houseOwnerPhoneNumber: room.house.owner.phoneNumber,
+  };
+  const bankInfo = {
+    bankAccountName: room.house.owner.bankAccountName,
+    bankAccountNumber: room.house.owner.bankAccountNumber,
+    bankName: room.house.owner.bankName,
+  };
 
   const invoiceTitle = i18nService.t('billing.invoiceTitle', { lang });
   const fromLandlord = i18nService.t('billing.fromLandlord', { lang });
@@ -210,10 +383,7 @@ export const generateBillingExcel = async (
   const ownerInfo = [
     [nameLabel, bankInfo.bankAccountName],
     [addressLabel, houseInfo.houseAddress],
-    [
-      phoneLabel,
-      `${houseInfo.houseOwnerPhoneNumber || ''} - ${houseInfo.houseOwnerBackupPhoneNumber || ''}`,
-    ],
+    [phoneLabel, `${houseInfo.houseOwnerPhoneNumber || ''} `],
     [bankAccountLabel, `${bankInfo.bankName} - ${bankInfo.bankAccountNumber}`],
   ];
 

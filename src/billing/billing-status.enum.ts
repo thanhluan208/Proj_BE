@@ -3,3 +3,8 @@ export enum BillingStatusEnum {
   PENDING_TENANT_PAYMENT = 'PENDING_TENANT_PAYMENT',
   PAID = 'PAID',
 }
+
+export enum BillingTypeEnum {
+  RECURRING = 'RECURRING',
+  USAGE_BASED = 'USAGE_BASED',
+}

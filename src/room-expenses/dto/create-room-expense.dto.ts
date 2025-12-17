@@ -11,6 +11,7 @@ import {
   IsNumberString,
   IsOptional,
   IsBoolean,
+  IsBooleanString,
 } from 'class-validator';
 
 export class Expense {
@@ -54,6 +55,13 @@ export class Expense {
   })
   @IsDateString()
   date: string;
+
+  @ApiProperty({
+    type: Boolean,
+    example: 'Is Asset Handed Over',
+  })
+  @IsBooleanString()
+  isAssetHandedOver: boolean;
 
   @ApiProperty({
     type: 'string',

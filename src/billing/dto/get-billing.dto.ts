@@ -7,7 +7,7 @@ import {
   IsString,
 } from 'class-validator';
 import { PaginationDto } from 'src/utils/dto/pagination.dto';
-import { BillingStatusEnum } from '../billing-status.enum';
+import { BillingStatusEnum, BillingTypeEnum } from '../billing-status.enum';
 import { SortOrder } from 'src/utils/types/common.type';
 
 export enum BillingSortField {
@@ -36,6 +36,15 @@ export class GetBillingDto extends PaginationDto {
   @IsOptional()
   @IsEnum(BillingStatusEnum)
   status?: BillingStatusEnum;
+
+  @ApiProperty({
+    enum: BillingTypeEnum,
+    description: 'The status of the room ',
+    example: 'active',
+  })
+  @IsOptional()
+  @IsEnum(BillingTypeEnum)
+  type?: BillingTypeEnum;
 
   @ApiProperty({
     type: Date,

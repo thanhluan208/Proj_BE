@@ -1,91 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   IsDateString,
+  IsEnum,
   IsNotEmpty,
   IsNumber,
-  IsNumberString,
   IsOptional,
   IsString,
   Min,
-  ValidateNested,
+  ValidateIf,
 } from 'class-validator';
-
-class HouseInfo {
-  @ApiProperty({
-    type: String,
-    description: 'The address of the house',
-    example: '123 Main St',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  houseAddress?: string;
-
-  @ApiProperty({
-    type: String,
-    description: 'The owner of the house',
-    example: 'John Doe',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  houseOwner?: string;
-
-  @ApiProperty({
-    type: String,
-    description: 'The owner of the house',
-    example: 'John Doe',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  houseOwnerPhoneNumber?: string;
-
-  @ApiProperty({
-    type: String,
-    description: 'The owner of the house',
-    example: 'John Doe',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  houseOwnerBackupPhoneNumber?: string;
-}
-
-class BankInfo {
-  @ApiProperty({
-    type: String,
-    description: 'The owner of the house',
-    example: 'John Doe',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  bankAccountName?: string;
-
-  @ApiProperty({
-    type: String,
-    description: 'The owner of the house',
-    example: 'John Doe',
-    required: false,
-  })
-  @Transform(({ value }) => (value === '' ? undefined : value))
-  @IsOptional()
-  @IsNumberString()
-  bankAccountNumber?: string;
-
-  @ApiProperty({
-    type: String,
-    description: 'The owner of the house',
-    example: 'John Doe',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  bankName?: string;
-}
-
+import { BillingTypeEnum } from '../billing-status.enum';
 export class CreateBillingDto {
   @ApiProperty({
     type: String,
@@ -111,6 +36,11 @@ export class CreateBillingDto {
   @IsString()
   notes: string;
 
+  @ApiProperty({ example: BillingTypeEnum.USAGE_BASED })
+  @IsEnum(BillingTypeEnum)
+  type: BillingTypeEnum;
+
+  @ValidateIf((o) => o.type === BillingTypeEnum.USAGE_BASED)
   @ApiProperty({ example: 100 })
   @IsNotEmpty()
   @Transform(({ value }) => Number(value))
@@ -118,6 +48,7 @@ export class CreateBillingDto {
   @Min(0)
   electricity_start_index: number;
 
+  @ValidateIf((o) => o.type === BillingTypeEnum.USAGE_BASED)
   @ApiProperty({ example: 150 })
   @IsNotEmpty()
   @Transform(({ value }) => Number(value))
@@ -125,6 +56,7 @@ export class CreateBillingDto {
   @Min(0)
   electricity_end_index: number;
 
+  @ValidateIf((o) => o.type === BillingTypeEnum.USAGE_BASED)
   @ApiProperty({ example: 50 })
   @IsNotEmpty()
   @Transform(({ value }) => Number(value))
@@ -132,18 +64,11 @@ export class CreateBillingDto {
   @Min(0)
   water_start_index: number;
 
+  @ValidateIf((o) => o.type === BillingTypeEnum.USAGE_BASED)
   @ApiProperty({ example: 60 })
   @IsNotEmpty()
   @Transform(({ value }) => Number(value))
   @IsNumber()
   @Min(0)
   water_end_index: number;
-
-  @ValidateNested()
-  @Type(() => HouseInfo)
-  houseInfo: HouseInfo;
-
-  @ValidateNested()
-  @Type(() => BankInfo)
-  bankInfo: BankInfo;
 }
