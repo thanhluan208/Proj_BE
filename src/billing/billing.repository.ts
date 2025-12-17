@@ -176,12 +176,10 @@ export class BillingRepository {
     roomId: string,
     type: string,
     from: Date,
-    to: Date,
-  ): Promise<boolean> {
+  ): Promise<BillingEntity | null> {
     const fromDate = new Date(from);
-    const toDate = new Date(to);
 
-    const count = await this.repository
+    const find = await this.repository
       .createQueryBuilder('billing')
       .leftJoin('billing.room', 'room')
       .where('room.id = :roomId', { roomId })
@@ -192,14 +190,8 @@ export class BillingRepository {
       .andWhere('EXTRACT(YEAR FROM billing.from) = :fromYear', {
         fromYear: fromDate.getFullYear(),
       })
-      .andWhere('EXTRACT(MONTH FROM billing.to) = :toMonth', {
-        toMonth: toDate.getMonth() + 1,
-      })
-      .andWhere('EXTRACT(YEAR FROM billing.to) = :toYear', {
-        toYear: toDate.getFullYear(),
-      })
-      .getCount();
+      .getOne();
 
-    return count > 0;
+    return find;
   }
 }

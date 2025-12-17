@@ -46,34 +46,7 @@ export class BillingService {
   ) {}
 
   async create(dto: CreateBillingDto, user: JwtPayloadType) {
-    const indexesProvided =
-      dto.electricity_start_index != null ||
-      dto.electricity_end_index != null ||
-      dto.water_start_index != null ||
-      dto.water_end_index != null;
-
-    this.logger.log({ dto, indexesProvided });
-
-    if (dto.type !== BillingTypeEnum.USAGE_BASED && indexesProvided) {
-      throw new BadRequestException({
-        status: HttpStatus.BAD_REQUEST,
-        message: `Recurring type of bill should not include indexes info.`,
-      });
-    }
-
-    const isDuplicate = await this.repository.findDuplicateBill(
-      dto.roomId,
-      dto.type,
-      dto.from,
-      dto.to,
-    );
-
-    if (isDuplicate) {
-      throw new BadRequestException({
-        status: HttpStatus.BAD_REQUEST,
-        message: 'A bill of this type already exists for this month range.',
-      });
-    }
+    await this.validateCreate(dto);
 
     const { currentTenantContract, file, totalAmount } =
       await this.generateBill(dto, user);
@@ -120,20 +93,17 @@ export class BillingService {
   }
 
   async update(id: string, dto: CreateBillingDto, user: JwtPayloadType) {
-    const targetBill = await this.repository.findById(id, user.id);
-    if (!targetBill) {
-      throw new BadRequestException({
-        status: HttpStatus.BAD_REQUEST,
-        message: 'No bill found',
-      });
-    }
+    await this.validateCreate(dto, id);
 
-    if (targetBill.status === BillingStatusEnum.PAID) {
-      throw new BadRequestException({
-        status: HttpStatus.BAD_REQUEST,
-        message: 'This bill have been already paid! Can not update.',
-      });
-    }
+    const targetBill = await this.repository.findById(id, user.id, [
+      'tenantContract',
+      'tenantContract.tenant',
+      'tenantContract.contract',
+      'tenantContract.tenant.status',
+      'tenantContract.contract.status',
+    ]);
+
+    await this.validateEdit(targetBill, dto);
 
     const { currentTenantContract, file, totalAmount } =
       await this.generateBill(dto, user);
@@ -436,7 +406,13 @@ export class BillingService {
         sortOrder: dto.sortOrder as SortOrder,
         ...options,
       },
-      ['tenantContract', 'tenantContract.tenant', 'tenantContract.contract'],
+      [
+        'tenantContract',
+        'tenantContract.tenant',
+        'tenantContract.contract',
+        'tenantContract.tenant.status',
+        'tenantContract.contract.status',
+      ],
     )) as BillingEntity[];
 
     if (bills.length > 0) {
@@ -469,5 +445,91 @@ export class BillingService {
       );
 
     return cachedVersion;
+  }
+
+  async validateCreate(dto: CreateBillingDto, currentBillId?: string) {
+    const indexesProvided =
+      dto.electricity_start_index != null ||
+      dto.electricity_end_index != null ||
+      dto.water_start_index != null ||
+      dto.water_end_index != null;
+
+    this.logger.log({ dto, indexesProvided });
+
+    if (dto.type !== BillingTypeEnum.USAGE_BASED && indexesProvided) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: `Recurring type of bill should not include indexes info.`,
+      });
+    }
+
+    const duplicateBill = await this.repository.findDuplicateBill(
+      dto.roomId,
+      dto.type,
+      dto.from,
+    );
+
+    if (
+      (!!currentBillId &&
+        !!duplicateBill &&
+        duplicateBill.id !== currentBillId) ||
+      !!duplicateBill
+    ) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'A bill of this type already exists for this month range.',
+      });
+    }
+  }
+
+  async validateEdit(targetBill: BillingEntity | null, dto: CreateBillingDto) {
+    const indexesProvided =
+      dto.electricity_start_index != null ||
+      dto.electricity_end_index != null ||
+      dto.water_start_index != null ||
+      dto.water_end_index != null;
+
+    this.logger.log({ dto, indexesProvided });
+
+    if (dto.type !== BillingTypeEnum.USAGE_BASED && indexesProvided) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: `Recurring type of bill should not include indexes info.`,
+      });
+    }
+
+    if (!targetBill) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'No bill found',
+      });
+    }
+
+    if (targetBill.status === BillingStatusEnum.PAID) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'This bill have been already paid! Can not update.',
+      });
+    }
+
+    if (
+      !targetBill.tenantContract.tenant?.status?.id &&
+      targetBill.tenantContract.tenant?.status?.id === StatusEnum.inactive
+    ) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'This tenant is already deactivated',
+      });
+    }
+
+    if (
+      !targetBill.tenantContract.contract?.status?.id &&
+      targetBill.tenantContract.contract?.status?.id === StatusEnum.inactive
+    ) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'This contract is already deactivated',
+      });
+    }
   }
 }
