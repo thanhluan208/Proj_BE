@@ -20,7 +20,7 @@ export class RoomRepository {
   async findById(id: string): Promise<RoomEntity | null> {
     return await this.roomRepository.findOne({
       where: { id },
-      relations: ['house'],
+      relations: ['house', 'house.owner'],
     });
   }
 

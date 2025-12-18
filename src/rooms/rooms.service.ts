@@ -8,6 +8,8 @@ import {
 import { JwtPayloadType } from 'src/auth/strategies/types/jwt-payload.type';
 import { HousesService } from 'src/houses/houses.service';
 import { RedisService } from 'src/redis/redis.service';
+import { StatusEntity } from 'src/statuses/status.entity';
+import { StatusEnum } from 'src/statuses/statuses.enum';
 import { UserService } from 'src/users/users.service';
 import { REDIS_PREFIX_KEY } from 'src/utils/constant';
 import {
@@ -19,18 +21,16 @@ import { UpdateRoomDto } from './dto/update-room.dto';
 import { GetRoomsDto } from './dto/get-rooms.dto';
 import { RoomEntity } from './room.entity';
 import { RoomRepository } from './room.repository';
-import { StatusEnum } from 'src/statuses/statuses.enum';
-import { StatusEntity } from 'src/statuses/status.entity';
 
-import { FilesService } from 'src/files/files.service';
-import { RoomDetailResponseDto } from './dto/room-detail-response.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { TenantEntity } from 'src/tenant/tenant.entity';
-import { IsNull, Repository } from 'typeorm';
-import { BillingEntity } from 'src/billing/billing.entity';
-import { RoomExpenseEntity } from 'src/room-expenses/room-expense.entity';
 import { createHash } from 'crypto';
 import { BillingStatusEnum } from 'src/billing/billing-status.enum';
+import { BillingEntity } from 'src/billing/billing.entity';
+import { FilesService } from 'src/files/files.service';
+import { RoomExpenseEntity } from 'src/room-expenses/room-expense.entity';
+import { TenantEntity } from 'src/tenant/tenant.entity';
+import { IsNull, Repository } from 'typeorm';
+import { RoomDetailResponseDto } from './dto/room-detail-response.dto';
 
 @Injectable()
 export class RoomsService {
@@ -53,12 +53,10 @@ export class RoomsService {
   ) {}
 
   async create(createRoomDto: CreateRoomDto, userJwtPayload: JwtPayloadType) {
-    const currentUser = await this.userService.findById(userJwtPayload.id);
-
     this.logger.log(`Checking if house exists with ID: ${createRoomDto.house}`);
     const house = await this.houseService.findById(
       createRoomDto.house,
-      currentUser.id,
+      userJwtPayload.id,
     );
 
     if (!house) {
@@ -72,21 +70,19 @@ export class RoomsService {
     }
 
     this.logger.log(
-      `House owner ID: ${house.owner?.id}, Current user ID: ${currentUser.id}`,
+      `House owner ID: ${house.owner?.id}, Current user ID: ${userJwtPayload.id}`,
     );
 
+    const status = new StatusEntity();
+    status.id = StatusEnum.active;
     const room = await this.roomsRepository.create({
       ...createRoomDto,
       house: house,
-      status: {
-        id: StatusEnum.active,
-      } as StatusEntity,
+      status,
     });
 
-    // Create folder for room
-    await this.filesService.createFolder(`${house.id}/${room.id}`);
     await this.redisService.incr(
-      `${this.CACHE_ROOM_VERSION_KEY}:${currentUser.id}:${house.id}`,
+      `${this.CACHE_ROOM_VERSION_KEY}:${userJwtPayload.id}:${house.id}`,
     );
 
     this.logger.log(`Room created successfully with ID: ${room.id}`);
@@ -109,23 +105,7 @@ export class RoomsService {
       });
     }
 
-    const { house: houseId, ...rest } = updateRoomDto;
-
-    if (houseId) {
-      const house = await this.houseService.findById(houseId, userId);
-      if (!house) {
-        throw new BadRequestException({
-          status: HttpStatus.BAD_REQUEST,
-          errors: {
-            house: 'houseNotFound',
-          },
-        });
-      }
-
-      room.house = house;
-    }
-
-    const updatedRoom = { ...room, ...rest };
+    const updatedRoom = { ...room, ...updateRoomDto };
 
     const result = await this.roomsRepository.update(id, {
       ...updatedRoom,
@@ -136,6 +116,30 @@ export class RoomsService {
     );
 
     return result;
+  }
+
+  async delete(id: string, user: JwtPayloadType) {
+    const targetRoom = await this.roomsRepository.findById(id);
+
+    if (!targetRoom) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'This room is not exist!',
+      });
+    }
+
+    if (targetRoom.house.owner.id !== user.id) {
+      throw new BadRequestException({
+        status: HttpStatus.FORBIDDEN,
+      });
+    }
+
+    await this.roomsRepository.remove(id);
+    await this.redisService.incr(
+      `${this.CACHE_ROOM_VERSION_KEY}:${user.id}:${targetRoom.house.id}`,
+    );
+
+    return targetRoom;
   }
 
   async findById(

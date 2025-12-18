@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -57,6 +58,19 @@ export class RoomsController {
     @Body() body: UpdateRoomDto,
   ): Promise<RoomEntity | null> {
     return this.roomsService.update(id, body, request.user.id);
+  }
+
+  @ApiCreatedResponse({
+    type: RoomEntity,
+  })
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiParam({ name: 'id', type: String, description: 'Room ID' })
+  delete(
+    @Param('id') id: string,
+    @Request() request,
+  ): Promise<RoomEntity | null> {
+    return this.roomsService.delete(id, request.user);
   }
 
   @ApiCreatedResponse({
