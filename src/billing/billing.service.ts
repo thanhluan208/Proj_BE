@@ -244,6 +244,8 @@ export class BillingService {
       (elm) => elm.status?.id === StatusEnum.active,
     );
 
+    const isOverRental = room.maxTenant < room.contracts.length;
+
     if (!activeContract) {
       throw new BadRequestException({
         status: HttpStatus.BAD_REQUEST,
@@ -272,6 +274,7 @@ export class BillingService {
       dto,
       contract,
       this.i18nService,
+      isOverRental,
     );
 
     const buffer = await generateBillingExcel(

@@ -87,8 +87,7 @@ export class UserService {
     const hashedPassword = await bcrypt.hash(createUserDto.password, salt);
 
     const user = await this.usersRepository.create({
-      firstName: createUserDto.firstName,
-      lastName: createUserDto.lastName,
+      fullName: createUserDto.fullName,
       provider: createUserDto.provider ?? AuthProvidersEnum.email,
       role: role as any,
       status: status as any,
@@ -223,11 +222,8 @@ export class UserService {
       };
     }
 
-    return this.usersRepository.update(id, {
-      // Do not remove comment below.
-      // <updating-property-payload />
-      firstName: updateUserDto.firstName,
-      lastName: updateUserDto.lastName,
+    const response = await this.usersRepository.update(id, {
+      fullName: updateUserDto.fullName,
       email,
       password,
       role: role as any,
@@ -238,6 +234,10 @@ export class UserService {
       bankAccountNumber: updateUserDto.bankAccountNumber,
       bankName: updateUserDto.bankName,
     });
+
+    await this.redisService.incr(`${this.CACHE_USER_VERSION_KEY}:${id}`);
+
+    return response;
   }
 
   async remove(id: string): Promise<void> {

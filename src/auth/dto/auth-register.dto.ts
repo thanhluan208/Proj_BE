@@ -40,36 +40,20 @@ export class AuthRegisterLoginDto {
   password: string;
 
   @ApiProperty({
-    example: 'John',
-    description: 'User first name',
+    example: 'John Doe',
+    description: 'User full name',
     minLength: 1,
-    maxLength: 50,
+    maxLength: 100,
   })
   @Transform(({ value }) => value?.trim())
-  @IsString({ message: 'First name must be a string' })
-  @IsNotEmpty({ message: 'First name is required' })
-  @Length(1, 50, { message: 'First name must be between 1 and 50 characters' })
+  @IsString({ message: 'Full name must be a string' })
+  @IsNotEmpty({ message: 'Full name is required' })
+  @Length(1, 100, { message: 'Full name must be between 1 and 100 characters' })
   @Matches(/^[a-zA-Z\s'-]+$/, {
     message:
-      'First name can only contain letters, spaces, hyphens and apostrophes',
+      'Full name can only contain letters, spaces, hyphens and apostrophes',
   })
-  firstName: string;
-
-  @ApiProperty({
-    example: 'Doe',
-    description: 'User last name',
-    minLength: 1,
-    maxLength: 50,
-  })
-  @Transform(({ value }) => value?.trim())
-  @IsString({ message: 'Last name must be a string' })
-  @IsNotEmpty({ message: 'Last name is required' })
-  @Length(1, 50, { message: 'Last name must be between 1 and 50 characters' })
-  @Matches(/^[a-zA-Z\s'-]+$/, {
-    message:
-      'Last name can only contain letters, spaces, hyphens and apostrophes',
-  })
-  lastName: string;
+  fullName: string;
 
   @ApiProperty({
     example: AuthProvidersEnum.email,

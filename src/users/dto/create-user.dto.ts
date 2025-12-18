@@ -21,13 +21,9 @@ export class CreateUserDto {
 
   provider?: string;
 
-  @ApiProperty({ example: 'John', type: String })
+  @ApiProperty({ example: 'John Doe', type: String })
   @IsNotEmpty()
-  firstName: string | null;
-
-  @ApiProperty({ example: 'Doe', type: String })
-  @IsNotEmpty()
-  lastName: string | null;
+  fullName: string;
 
   @ApiPropertyOptional({ type: RoleDto })
   @IsOptional()

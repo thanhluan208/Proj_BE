@@ -82,19 +82,10 @@ export class UserEntity extends EntityRelationalHelper {
 
   @ApiProperty({
     type: String,
-    example: 'John',
+    example: 'John Doe',
   })
-  @Index()
-  @Column({ type: String, nullable: true })
-  firstName: string | null;
-
-  @ApiProperty({
-    type: String,
-    example: 'Doe',
-  })
-  @Index()
-  @Column({ type: String, nullable: true })
-  lastName: string | null;
+  @Column({ type: String, default: 'John Doe' })
+  fullName: string;
 
   @ApiProperty({
     type: () => RoleEntity,
@@ -111,7 +102,6 @@ export class UserEntity extends EntityRelationalHelper {
   @ManyToOne(() => StatusEntity, {
     eager: true,
   })
-  @Expose({ groups: ['admin'] })
   status?: StatusEntity;
 
   @ApiProperty()
@@ -124,6 +114,5 @@ export class UserEntity extends EntityRelationalHelper {
 
   @ApiProperty()
   @DeleteDateColumn()
-  @Expose({ groups: ['admin'] })
   deletedAt: Date;
 }

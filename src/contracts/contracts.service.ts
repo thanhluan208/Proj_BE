@@ -464,7 +464,7 @@ export class ContractsService {
       createdDay: dayjs(createdDate).format('DD'),
       createdMonth: dayjs(createdDate).format('MM'),
       createdYear: dayjs(createdDate).format('YYYY'),
-      houseOwner: houseOwner || `${owner.lastName} ${owner.firstName}`,
+      houseOwner: houseOwner || `${owner.fullName} `,
       houseAddress: houseAddress || house.address,
       houseOwnerPhoneNumber: houseOwnerPhoneNumber || owner.phoneNumber,
       houseOwnerBackupPhoneNumber: houseOwnerBackupPhoneNumber,

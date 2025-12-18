@@ -25,9 +25,10 @@ const hasUtilityMeterReadings = (
   return hasElectricMeters || hasWaterMeters;
 };
 
-const handleBillingItemConcurrent = (
+const handleBillingItemRecurring = (
   i18nService: I18nService,
   contract: ContractEntity,
+  isOverRental: boolean,
 ) => {
   const lang = I18nContext.current()?.lang;
   const isFixWater = Number(contract.fixed_water_fee) > 0;
@@ -90,6 +91,14 @@ const handleBillingItemConcurrent = (
       amount: contract.parking_fee,
     });
   }
+  if (isOverRental && contract.overRentalFee) {
+    billingItems.push({
+      description: i18nService.t('billing.overRentalFee', { lang }),
+      quantity: 1,
+      unitPrice: Number(contract.overRentalFee),
+      amount: Number(contract.overRentalFee),
+    });
+  }
 
   return billingItems;
 };
@@ -137,6 +146,7 @@ export const calculateBillCost = (
   dto: CreateBillingDto,
   contract: ContractEntity,
   i18nService: I18nService,
+  isOverRental: boolean,
 ) => {
   const isFixWater = Number(contract.fixed_water_fee) > 0;
   const isFixElectric = Number(contract.fixed_electricity_fee) > 0;
@@ -174,7 +184,8 @@ export const calculateBillCost = (
       Number(contract.internet_fee) +
       Number(contract.living_fee) +
       Number(contract.parking_fee) +
-      Number(contract.cleaning_fee);
+      Number(contract.cleaning_fee) +
+      Number(isOverRental ? contract.overRentalFee : 0);
   }
   if (type === BillingTypeEnum.USAGE_BASED) {
     totalAmount =
@@ -203,7 +214,11 @@ export const calculateBillCost = (
   let billingItems: Item[] = [];
 
   if (dto.type === BillingTypeEnum.RECURRING) {
-    billingItems = handleBillingItemConcurrent(i18nService, contract);
+    billingItems = handleBillingItemRecurring(
+      i18nService,
+      contract,
+      isOverRental,
+    );
   }
   if (dto.type === BillingTypeEnum.USAGE_BASED) {
     console.log('handleBillingItemUsageBase', contract);

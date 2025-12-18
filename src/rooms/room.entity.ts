@@ -42,6 +42,14 @@ export class RoomEntity extends EntityRelationalHelper {
 
   @ApiProperty({
     type: String,
+    example: '2',
+  })
+  @Index()
+  @Column({ type: Number, default: 2 })
+  maxTenant: number;
+
+  @ApiProperty({
+    type: String,
     example: `101 description`,
     nullable: true,
   })
