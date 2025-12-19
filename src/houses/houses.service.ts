@@ -46,22 +46,18 @@ export class HousesService {
       status,
     });
 
-    // Create folder for house
-    await this.filesService.createFolder(house.id);
-
-    const houseCacheVersion = await this.redisService.get(
-      `${this.CACHE_HOUSE_VERSION_KEY}:${currentUser.id}`,
+    await this.redisService.incr(
+      `${this.CACHE_HOUSE_VERSION_KEY}:${house.owner.id}`,
     );
-
-    const cachedKey = `${REDIS_PREFIX_KEY.house}:${currentUser.id}:total:v${houseCacheVersion}`;
-
-    await this.redisService.del(cachedKey);
-
     return house;
   }
 
-  async update(id: string, updateHouseDto: Partial<CreateHouseDto>) {
-    const house = await this.houseRepository.findById(id);
+  async update(
+    id: string,
+    updateHouseDto: Partial<CreateHouseDto>,
+    user: JwtPayloadType,
+  ) {
+    const house = await this.houseRepository.findByIdAndOwner(id, user.id);
     if (!house) {
       throw new BadRequestException({
         status: HttpStatus.BAD_REQUEST,
@@ -75,10 +71,24 @@ export class HousesService {
       ...updateHouseDto,
     });
     // Invalidate cache
-    await this.redisService.incr(
-      `${this.CACHE_HOUSE_VERSION_KEY}:${house.owner.id}`,
-    );
+    await this.redisService.incr(`${this.CACHE_HOUSE_VERSION_KEY}:${user.id}`);
     return updatedHouse;
+  }
+
+  async delete(id: string, user: JwtPayloadType) {
+    const house = await this.houseRepository.findByIdAndOwner(id, user.id);
+    if (!house) {
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        errors: {
+          house: 'houseNotFound',
+        },
+      });
+    }
+
+    await this.houseRepository.remove(id);
+    await this.redisService.incr(`${this.CACHE_HOUSE_VERSION_KEY}:${user.id}`);
+    return house;
   }
 
   async findById(id: string, userId: string) {

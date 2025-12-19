@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateRoomDto {
@@ -28,6 +29,16 @@ export class CreateRoomDto {
     type: Number,
     description: 'Room size in square meters',
   })
+  @Transform(({ value }) => Number(value))
   @IsNumber()
   size_sq_m: number;
+
+  @ApiProperty({
+    example: 2,
+    type: Number,
+    description: 'Max tenant in one room',
+  })
+  @Transform(({ value }) => Number(value))
+  @IsNumber()
+  maxTenant?: number;
 }

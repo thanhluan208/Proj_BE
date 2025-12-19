@@ -11,11 +11,14 @@ import {
   Query,
   Req,
   Request,
+  Res,
+  StreamableFile,
   UploadedFile,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import {
@@ -23,6 +26,7 @@ import {
   ApiBody,
   ApiConsumes,
   ApiCreatedResponse,
+  ApiOkResponse,
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
@@ -186,5 +190,41 @@ export class TenantController {
     @Param('id') id: string,
   ): Promise<{ success: boolean; message: string }> {
     return this.tenantService.delete(id, request.user);
+  }
+
+  @ApiOkResponse({
+    description: 'Download both front and back ID card images as a zip file',
+    schema: {
+      type: 'string',
+      format: 'binary',
+    },
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    required: true,
+    description: 'Tenant ID',
+  })
+  @Get(':id/download-id-cards')
+  @HttpCode(HttpStatus.OK)
+  async downloadIdCards(
+    @Request() request,
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { stream, filename } = await this.tenantService.downloadIdCards(
+      id,
+      request.user,
+    );
+
+    // Use RFC 5987 encoding for international characters
+    const encodedFilename = encodeURIComponent(filename);
+
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${filename}"; filename*=UTF-8''${encodedFilename}`,
+    });
+
+    return new StreamableFile(stream);
   }
 }

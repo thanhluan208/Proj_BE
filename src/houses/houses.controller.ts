@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -32,7 +33,7 @@ import { CheckOwnershipDynamic } from 'src/auth/decorators/ownership.decorator';
 
 @ApiBearerAuth()
 @ApiTags('houses')
-@UseGuards(AuthGuard(AUTH_CONSTANTS.jwt), OwnershipGuard)
+@UseGuards(AuthGuard(AUTH_CONSTANTS.jwt))
 @Controller('houses')
 export class HousesController {
   constructor(private readonly housesService: HousesService) {}
@@ -55,16 +56,25 @@ export class HousesController {
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiParam({ name: 'id', required: true, description: 'House ID' })
-  @CheckOwnershipDynamic({
-    entity: HouseEntity,
-    ownerField: 'owner',
-    resourceIdParam: 'id',
-  })
   update(
     @Param('id') id: string,
     @Body() body: CreateHouseDto,
+    @Request() request,
   ): Promise<HouseEntity | null> {
-    return this.housesService.update(id, body);
+    return this.housesService.update(id, body, request.user);
+  }
+
+  @ApiCreatedResponse({
+    type: HouseEntity,
+  })
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiParam({ name: 'id', required: true, description: 'House ID' })
+  delete(
+    @Param('id') id: string,
+    @Request() request,
+  ): Promise<HouseEntity | null> {
+    return this.housesService.delete(id, request.user);
   }
 
   @ApiCreatedResponse({

@@ -82,7 +82,7 @@ export class RoomsService {
     });
 
     await this.redisService.incr(
-      `${this.CACHE_ROOM_VERSION_KEY}:${userJwtPayload.id}:${house.id}`,
+      `${this.CACHE_ROOM_VERSION_KEY}:${userJwtPayload.id}`,
     );
 
     this.logger.log(`Room created successfully with ID: ${room.id}`);
@@ -111,9 +111,7 @@ export class RoomsService {
       ...updatedRoom,
     });
 
-    await this.redisService.incr(
-      `${this.CACHE_ROOM_VERSION_KEY}:${userId}:${room.house.id}`,
-    );
+    await this.redisService.incr(`${this.CACHE_ROOM_VERSION_KEY}:${userId}`);
 
     return result;
   }
@@ -135,9 +133,7 @@ export class RoomsService {
     }
 
     await this.roomsRepository.remove(id);
-    await this.redisService.incr(
-      `${this.CACHE_ROOM_VERSION_KEY}:${user.id}:${targetRoom.house.id}`,
-    );
+    await this.redisService.incr(`${this.CACHE_ROOM_VERSION_KEY}:${user.id}`);
 
     return targetRoom;
   }
@@ -244,7 +240,7 @@ export class RoomsService {
 
     const cacheVersion =
       (await this.redisService.get(
-        `${this.CACHE_ROOM_VERSION_KEY}:${userId}:${house.id}`,
+        `${this.CACHE_ROOM_VERSION_KEY}:${userId}`,
       )) ?? '0';
 
     const cacheKey = `${REDIS_PREFIX_KEY.room}:${house.id}:${page}:${pageSize}:v${cacheVersion}`;
@@ -295,7 +291,7 @@ export class RoomsService {
 
     const cacheVersion =
       (await this.redisService.get(
-        `${this.CACHE_ROOM_VERSION_KEY}:${userId}:${house.id}`,
+        `${this.CACHE_ROOM_VERSION_KEY}:${userId}`,
       )) ?? '0';
 
     const cacheKey = `${REDIS_PREFIX_KEY.room}:${house.id}:v${cacheVersion}:total`;

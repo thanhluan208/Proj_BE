@@ -60,7 +60,6 @@ export class HouseEntity extends EntityRelationalHelper {
   @ManyToOne(() => StatusEntity, {
     eager: true,
   })
-  @Expose({ groups: ['admin'] })
   status?: StatusEntity;
 
   @ApiProperty()

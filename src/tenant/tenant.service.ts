@@ -27,6 +27,8 @@ import { HouseEntity } from 'src/houses/house.entity';
 import dayjs from 'dayjs';
 import { randomUUID } from 'crypto';
 import { DataSource, EntityManager } from 'typeorm';
+import archiver from 'archiver';
+import { Readable } from 'stream';
 
 @Injectable()
 export class TenantService {
@@ -597,5 +599,109 @@ export class TenantService {
       backData?.issueLoc !== 'N/A' ? backData?.issueLoc : undefined;
 
     tenant.backIdCardImage = uploadedBackFile.file;
+  }
+
+  async downloadIdCards(
+    tenantId: string,
+    userJwtPayload: JwtPayloadType,
+  ): Promise<{ stream: Readable; filename: string }> {
+    const LOG_PREFIX = '[TENANT_DOWNLOAD_ID_CARDS]';
+    this.logger.log(
+      `${LOG_PREFIX} Downloading ID cards for tenant ${tenantId}`,
+    );
+
+    // Validate user and tenant ownership, include file relations
+    const { tenant } = await TenantHelper.validateUserAndTenantOwnership(
+      this.usersService,
+      this.tenantRepository,
+      userJwtPayload,
+      tenantId,
+      false,
+    );
+
+    // Fetch tenant with file relations
+    const tenantWithFiles = await this.tenantRepository.findById(tenantId, [
+      'frontIdCardImage',
+      'backIdCardImage',
+    ]);
+
+    if (!tenantWithFiles) {
+      this.logger.error(`${LOG_PREFIX} Tenant not found with ID: ${tenantId}`);
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Tenant not found',
+      });
+    }
+
+    // Check if at least one ID card image exists
+    if (!tenantWithFiles.frontIdCardImage && !tenantWithFiles.backIdCardImage) {
+      this.logger.warn(
+        `${LOG_PREFIX} No ID card images found for tenant ${tenantId}`,
+      );
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'No ID card images found for this tenant',
+      });
+    }
+
+    // Create zip archive
+    const archive = archiver('zip', {
+      zlib: { level: 9 }, // Maximum compression
+    });
+
+    // Handle archive errors
+    archive.on('error', (err) => {
+      this.logger.error(`${LOG_PREFIX} Archive error: ${err.message}`);
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: `Failed to create zip file: ${err.message}`,
+      });
+    });
+
+    // Add front ID card image if exists
+    if (tenantWithFiles.frontIdCardImage) {
+      this.logger.log(
+        `${LOG_PREFIX} Adding front ID card image to zip: ${tenantWithFiles.frontIdCardImage.originalName}`,
+      );
+      const { buffer } = await this.filesService.getFileBuffer(
+        tenantWithFiles.frontIdCardImage.id,
+      );
+      archive.append(buffer, {
+        name: tenantWithFiles.frontIdCardImage.originalName || 'front-id.jpg',
+      });
+    }
+
+    // Add back ID card image if exists
+    if (tenantWithFiles.backIdCardImage) {
+      this.logger.log(
+        `${LOG_PREFIX} Adding back ID card image to zip: ${tenantWithFiles.backIdCardImage.originalName}`,
+      );
+      const { buffer } = await this.filesService.getFileBuffer(
+        tenantWithFiles.backIdCardImage.id,
+      );
+      archive.append(buffer, {
+        name: tenantWithFiles.backIdCardImage.originalName || 'back-id.jpg',
+      });
+    }
+
+    // Finalize the archive
+    archive.finalize();
+
+    // Sanitize filename: remove special characters and replace spaces with hyphens
+    const sanitizedName = (tenantWithFiles.name || 'tenant')
+      .normalize('NFD') // Normalize to decomposed form
+      .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+      .replace(/[^a-zA-Z0-9-_]/g, '-') // Replace special chars with hyphen
+      .replace(/-+/g, '-') // Replace multiple hyphens with single
+      .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+
+    const filename = `${sanitizedName}-id-cards-${tenantId}.zip`;
+
+    this.logger.log(`${LOG_PREFIX} Successfully created zip file: ${filename}`);
+
+    return {
+      stream: archive as unknown as Readable,
+      filename,
+    };
   }
 }
