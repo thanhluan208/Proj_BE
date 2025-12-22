@@ -415,6 +415,7 @@ export class BillingService {
         'tenantContract.contract',
         'tenantContract.tenant.status',
         'tenantContract.contract.status',
+        'proof',
       ],
     )) as BillingEntity[];
 

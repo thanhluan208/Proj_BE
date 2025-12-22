@@ -16,9 +16,9 @@ export class ContractsRepository {
     return await this.contractRepository.save(contract);
   }
 
-  async findActiveContract() {
+  async findActiveContractByRoom(roomId: string) {
     return await this.contractRepository.findOne({
-      where: { status: { id: StatusEnum.active } },
+      where: { status: { id: StatusEnum.active }, room: { id: roomId } },
     });
   }
 

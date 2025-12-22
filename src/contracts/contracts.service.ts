@@ -66,7 +66,8 @@ export class ContractsService {
       userJwtPayload,
     );
 
-    const activeContract = await this.contractsRepository.findActiveContract();
+    const activeContract =
+      await this.contractsRepository.findActiveContractByRoom(room.id);
     if (activeContract) {
       throw new BadRequestException({
         status: HttpStatus.BAD_REQUEST,

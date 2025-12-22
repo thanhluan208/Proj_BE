@@ -124,6 +124,7 @@ export class BillingRepository {
         'tenantContract.contract',
         'room',
         'file',
+        'proof',
       ],
       select: true, // change to false if you only need joins for filtering
     });
