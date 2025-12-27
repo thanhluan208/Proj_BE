@@ -23,8 +23,7 @@ import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { TenantEntity } from './tenant.entity';
 import { TenantHelper } from './tenant.helper';
 import { TenantRepository } from './tenant.repository';
-import { HouseEntity } from 'src/houses/house.entity';
-import dayjs from 'dayjs';
+import dayjs, { convertToUTC, convertFromUTC } from 'src/utils/date-utils';
 import { randomUUID } from 'crypto';
 import { DataSource, EntityManager } from 'typeorm';
 import archiver from 'archiver';
@@ -44,116 +43,10 @@ export class TenantService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async uploadIdCard(
-    roomId: string,
-    files: {
-      frontImage?: Express.Multer.File;
-      backImage?: Express.Multer.File;
-    },
-    user: JwtPayloadType,
-    tenantId?: string,
-  ) {
-    const LOG_PREFIX = '[TENANT_UPLOAD_ID]';
-
-    this.logger.log(
-      `${LOG_PREFIX} Start upload ID card | roomId=${roomId}, tenantId=${tenantId ?? 'NEW'}, userId=${user.id}`,
-    );
-
-    if (!files.frontImage && !files.backImage) {
-      this.logger.warn(`${LOG_PREFIX} No images provided`);
-      throw new BadRequestException({
-        status: HttpStatus.BAD_REQUEST,
-        message: 'Either front or back image of citizenID is required',
-      });
-    }
-
-    let tenant = new TenantEntity();
-
-    if (tenantId) {
-      this.logger.log(`${LOG_PREFIX} Fetching tenant ${tenantId}`);
-      const existingTenant = await this.tenantRepository.findById(tenantId, [
-        'room',
-        'room.house',
-        'room.house.owner',
-      ]);
-
-      if (!existingTenant) {
-        this.logger.warn(
-          `${LOG_PREFIX} Tenant not found | tenantId=${tenantId}`,
-        );
-        throw new BadRequestException({
-          status: HttpStatus.BAD_REQUEST,
-          message: 'Tenant not found',
-        });
-      }
-
-      tenant = existingTenant;
-    } else {
-      tenant.id = randomUUID();
-    }
-
-    const room = await this.roomsService.findById(roomId, user.id);
-    if (!room) {
-      this.logger.warn(`${LOG_PREFIX} Room not found | roomId=${roomId}`);
-      throw new UnprocessableEntityException({
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-        errors: { room: 'roomNotFound' },
-      });
-    }
-
-    if (tenantId && tenant.room?.id !== room.id) {
-      this.logger.warn(
-        `${LOG_PREFIX} Tenant does not belong to room | tenantRoomId=${tenant.room?.id}, roomId=${room.id}`,
-      );
-      throw new BadRequestException({
-        status: HttpStatus.BAD_REQUEST,
-        message: `This tenant does not exist in room ${room.name}`,
-      });
-    }
-
-    tenant.room = room;
-    const tenantStatus = new StatusEntity();
-    tenantStatus.id = StatusEnum.active;
-
-    tenant.status = tenantStatus;
-
-    const filePath = `${user.id}/${room.house.id}/${room.id}/${tenant.id}/ID/`;
-
-    return this.dataSource.transaction(async (manager) => {
-      /** ---------- FRONT IMAGE ---------- */
-      await this.processFrontImageID({
-        filePath,
-        manager,
-        tenant,
-        tenantId,
-        image: files.frontImage,
-      });
-
-      /** ---------- BACK IMAGE ---------- */
-      await this.processBackImageID({
-        filePath,
-        manager,
-        tenant,
-        hasFrontImage: !!files.frontImage,
-        image: files.backImage,
-        tenantId,
-      });
-
-      this.logger.log(`${LOG_PREFIX} Uploading ${tenant.toJSON()}`);
-
-      const savedTenant = await this.tenantRepository.save(tenant);
-
-      this.logger.log(
-        `${LOG_PREFIX} Upload completed successfully | tenantId=${savedTenant.id}`,
-      );
-
-      return savedTenant;
-    });
-  }
-
   async create(
     createTenantDto: CreateTenantDto,
     userJwtPayload: JwtPayloadType,
+    timezone: string = 'UTC',
   ) {
     const currentUser = await this.usersService.findById(userJwtPayload.id);
     this.logger.log(
@@ -245,7 +138,9 @@ export class TenantService {
     const tenant = await this.tenantRepository.create({
       room: room,
       name: createTenantDto.name,
-      dob: createTenantDto.dob ? new Date(createTenantDto.dob) : undefined,
+      dob: createTenantDto.dob
+        ? (convertToUTC(createTenantDto.dob, timezone) as Date)
+        : undefined,
       address: createTenantDto.address,
       phoneNumber: createTenantDto.phoneNumber,
       citizenId: createTenantDto.citizenId,
@@ -253,7 +148,7 @@ export class TenantService {
       nationality: createTenantDto.nationality,
       home: createTenantDto.home,
       issueDate: createTenantDto.issueDate
-        ? new Date(createTenantDto.issueDate)
+        ? (convertToUTC(createTenantDto.issueDate, timezone) as Date)
         : undefined,
       issueLoc: createTenantDto.issueLoc,
       tenantJob: createTenantDto.tenantJob,
@@ -267,12 +162,187 @@ export class TenantService {
     await this.filesService.createFolder(`${house.id}/${room.id}/${tenant.id}`);
 
     this.logger.log(`Tenant created successfully with ID: ${tenant.id}`);
-    return tenant;
+    return this.formatTenantResponse(tenant, timezone);
+  }
+
+  async update(
+    tenantId: string,
+    updateTenantDto: UpdateTenantDto,
+    userJwtPayload: JwtPayloadType,
+    timezone: string = 'UTC',
+  ) {
+    this.logger.log(`Updating tenant with ID: ${tenantId}`);
+
+    // Validate user and tenant ownership
+    const { tenant } = await TenantHelper.validateUserAndTenantOwnership(
+      this.usersService,
+      this.tenantRepository,
+      userJwtPayload,
+      tenantId,
+    );
+
+    // Update tenant fields
+    if (updateTenantDto.name !== undefined) {
+      tenant.name = updateTenantDto.name;
+    }
+    if (updateTenantDto.dob !== undefined) {
+      tenant.dob = updateTenantDto.dob
+        ? (convertToUTC(updateTenantDto.dob, timezone) as Date)
+        : undefined;
+    }
+    if (updateTenantDto.address !== undefined) {
+      tenant.address = updateTenantDto.address;
+    }
+    if (updateTenantDto.phoneNumber !== undefined) {
+      tenant.phoneNumber = updateTenantDto.phoneNumber;
+    }
+    if (updateTenantDto.citizenId !== undefined) {
+      tenant.citizenId = updateTenantDto.citizenId;
+    }
+    if (updateTenantDto.sex !== undefined) {
+      tenant.sex = updateTenantDto.sex;
+    }
+    if (updateTenantDto.nationality !== undefined) {
+      tenant.nationality = updateTenantDto.nationality;
+    }
+    if (updateTenantDto.home !== undefined) {
+      tenant.home = updateTenantDto.home;
+    }
+    if (updateTenantDto.issueDate !== undefined) {
+      tenant.issueDate = updateTenantDto.issueDate
+        ? (convertToUTC(updateTenantDto.issueDate, timezone) as Date)
+        : undefined;
+    }
+    if (updateTenantDto.issueLoc !== undefined) {
+      tenant.issueLoc = updateTenantDto.issueLoc;
+    }
+    if (updateTenantDto.tenantJob !== undefined) {
+      tenant.tenantJob = updateTenantDto.tenantJob;
+    }
+    if (updateTenantDto.tenantWorkAt !== undefined) {
+      tenant.tenantWorkAt = updateTenantDto.tenantWorkAt;
+    }
+
+    const updatedTenant = await this.tenantRepository.save(tenant);
+    this.logger.log(`Tenant ${tenantId} updated successfully`);
+
+    return this.formatTenantResponse(updatedTenant, timezone);
+  }
+
+  async uploadIdCard(
+    roomId: string,
+    files: {
+      frontImage?: Express.Multer.File;
+      backImage?: Express.Multer.File;
+    },
+    user: JwtPayloadType,
+    tenantId?: string,
+    timezone: string = 'UTC',
+  ) {
+    const LOG_PREFIX = '[TENANT_UPLOAD_ID]';
+
+    this.logger.log(
+      `${LOG_PREFIX} Start upload ID card | roomId=${roomId}, tenantId=${tenantId ?? 'NEW'}, userId=${user.id}`,
+    );
+
+    if (!files.frontImage && !files.backImage) {
+      this.logger.warn(`${LOG_PREFIX} No images provided`);
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Either front or back image of citizenID is required',
+      });
+    }
+
+    let tenant = new TenantEntity();
+
+    if (tenantId) {
+      this.logger.log(`${LOG_PREFIX} Fetching tenant ${tenantId}`);
+      const existingTenant = await this.tenantRepository.findById(tenantId, [
+        'room',
+        'room.house',
+        'room.house.owner',
+      ]);
+
+      if (!existingTenant) {
+        this.logger.warn(
+          `${LOG_PREFIX} Tenant not found | tenantId=${tenantId}`,
+        );
+        throw new BadRequestException({
+          status: HttpStatus.BAD_REQUEST,
+          message: 'Tenant not found',
+        });
+      }
+
+      tenant = existingTenant;
+    } else {
+      tenant.id = randomUUID();
+    }
+
+    const room = await this.roomsService.findById(roomId, user.id);
+    if (!room) {
+      this.logger.warn(`${LOG_PREFIX} Room not found | roomId=${roomId}`);
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: { room: 'roomNotFound' },
+      });
+    }
+
+    if (tenantId && tenant.room?.id !== room.id) {
+      this.logger.warn(
+        `${LOG_PREFIX} Tenant does not belong to room | tenantRoomId=${tenant.room?.id}, roomId=${room.id}`,
+      );
+      throw new BadRequestException({
+        status: HttpStatus.BAD_REQUEST,
+        message: `This tenant does not exist in room ${room.name}`,
+      });
+    }
+
+    tenant.room = room;
+    const tenantStatus = new StatusEntity();
+    tenantStatus.id = StatusEnum.active;
+
+    tenant.status = tenantStatus;
+
+    const filePath = `${user.id}/${room.house.id}/${room.id}/${tenant.id}/ID/`;
+
+    return this.dataSource.transaction(async (manager) => {
+      /** ---------- FRONT IMAGE ---------- */
+      await this.processFrontImageID({
+        filePath,
+        manager,
+        tenant,
+        tenantId,
+        image: files.frontImage,
+      });
+
+      /** ---------- BACK IMAGE ---------- */
+      await this.processBackImageID({
+        filePath,
+        manager,
+        tenant,
+        hasFrontImage: !!files.frontImage,
+        image: files.backImage,
+        tenantId,
+      });
+
+      this.logger.log(
+        `${LOG_PREFIX} Uploading ${JSON.stringify(tenant.toJSON())}`,
+      );
+
+      const savedTenant = await this.tenantRepository.save(tenant);
+
+      this.logger.log(
+        `${LOG_PREFIX} Upload completed successfully | tenantId=${savedTenant.id}`,
+      );
+
+      return this.formatTenantResponse(savedTenant, timezone);
+    });
   }
 
   async findByRoom(
     userId: string,
     payload: GetTenantDto,
+    timezone: string = 'UTC',
   ): Promise<PaginatedResponseDto<TenantEntity>> {
     // 1. Find the room
     const room = await this.roomsService.findById(payload.room, userId);
@@ -282,6 +352,16 @@ export class TenantService {
         status: HttpStatus.UNPROCESSABLE_ENTITY,
         errors: { room: 'roomNotFound' },
       });
+    }
+
+    // Convert dates to UTC
+    if (payload.dateFrom) {
+      const utcDate = convertToUTC(payload.dateFrom, timezone);
+      payload.dateFrom = utcDate ? utcDate.toISOString() : payload.dateFrom;
+    }
+    if (payload.dateTo) {
+      const utcDate = convertToUTC(payload.dateTo, timezone);
+      payload.dateTo = utcDate ? utcDate.toISOString() : payload.dateTo;
     }
 
     // 3. Pagination
@@ -297,16 +377,39 @@ export class TenantService {
       dateTo: payload.dateTo,
       search: payload.search,
     });
+
+    const formattedTenants = tenants.map((tenant) =>
+      this.formatTenantResponse(tenant, timezone),
+    );
+
     return {
-      data: tenants,
+      data: formattedTenants,
       page,
       pageSize,
     };
   }
 
+  private formatTenantResponse(
+    tenant: TenantEntity,
+    timezone: string,
+  ): TenantEntity {
+    if (tenant.dob) {
+      tenant.dob = convertFromUTC(tenant.dob, timezone, 'DD/MM/YYYY') as any;
+    }
+    if (tenant.issueDate) {
+      tenant.issueDate = convertFromUTC(
+        tenant.issueDate,
+        timezone,
+        'DD/MM/YYYY',
+      ) as any;
+    }
+    return tenant;
+  }
+
   async countByRoom(
     userId: string,
     payload: GetTenantDto,
+    timezone: string = 'UTC',
   ): Promise<PaginationInfoResponseDto> {
     // 1. Find the room
     const room = await this.roomsService.findById(payload.room, userId);
@@ -317,6 +420,17 @@ export class TenantService {
         errors: { room: 'roomNotFound' },
       });
     }
+
+    // Convert dates to UTC
+    if (payload.dateFrom) {
+      const utcDate = convertToUTC(payload.dateFrom, timezone);
+      payload.dateFrom = utcDate ? utcDate.toISOString() : payload.dateFrom;
+    }
+    if (payload.dateTo) {
+      const utcDate = convertToUTC(payload.dateTo, timezone);
+      payload.dateTo = utcDate ? utcDate.toISOString() : payload.dateTo;
+    }
+
     // 2. Get the house and check ownership
     const house = room.house;
     if (!house || house.owner?.id !== userId) {
@@ -355,69 +469,6 @@ export class TenantService {
     return tenant;
   }
 
-  async update(
-    tenantId: string,
-    updateTenantDto: UpdateTenantDto,
-    userJwtPayload: JwtPayloadType,
-  ) {
-    this.logger.log(`Updating tenant with ID: ${tenantId}`);
-
-    // Validate user and tenant ownership
-    const { tenant } = await TenantHelper.validateUserAndTenantOwnership(
-      this.usersService,
-      this.tenantRepository,
-      userJwtPayload,
-      tenantId,
-    );
-
-    // Update tenant fields
-    if (updateTenantDto.name !== undefined) {
-      tenant.name = updateTenantDto.name;
-    }
-    if (updateTenantDto.dob !== undefined) {
-      tenant.dob = updateTenantDto.dob
-        ? new Date(updateTenantDto.dob)
-        : undefined;
-    }
-    if (updateTenantDto.address !== undefined) {
-      tenant.address = updateTenantDto.address;
-    }
-    if (updateTenantDto.phoneNumber !== undefined) {
-      tenant.phoneNumber = updateTenantDto.phoneNumber;
-    }
-    if (updateTenantDto.citizenId !== undefined) {
-      tenant.citizenId = updateTenantDto.citizenId;
-    }
-    if (updateTenantDto.sex !== undefined) {
-      tenant.sex = updateTenantDto.sex;
-    }
-    if (updateTenantDto.nationality !== undefined) {
-      tenant.nationality = updateTenantDto.nationality;
-    }
-    if (updateTenantDto.home !== undefined) {
-      tenant.home = updateTenantDto.home;
-    }
-    if (updateTenantDto.issueDate !== undefined) {
-      tenant.issueDate = updateTenantDto.issueDate
-        ? new Date(updateTenantDto.issueDate)
-        : undefined;
-    }
-    if (updateTenantDto.issueLoc !== undefined) {
-      tenant.issueLoc = updateTenantDto.issueLoc;
-    }
-    if (updateTenantDto.tenantJob !== undefined) {
-      tenant.tenantJob = updateTenantDto.tenantJob;
-    }
-    if (updateTenantDto.tenantWorkAt !== undefined) {
-      tenant.tenantWorkAt = updateTenantDto.tenantWorkAt;
-    }
-
-    const updatedTenant = await this.tenantRepository.save(tenant);
-    this.logger.log(`Tenant ${tenantId} updated successfully`);
-
-    return updatedTenant;
-  }
-
   async toggleStatus(tenantId: string, userJwtPayload: JwtPayloadType) {
     this.logger.log(`Toggling tenant ${tenantId} status`);
 
@@ -447,7 +498,7 @@ export class TenantService {
       `Tenant ${tenantId} status toggled from ${currentStatus === StatusEnum.active ? 'active' : 'inactive'} to ${newStatus === StatusEnum.active ? 'active' : 'inactive'}`,
     );
 
-    return updatedTenant;
+    return this.formatTenantResponse(updatedTenant, 'UTC');
   }
 
   async delete(tenantId: string, userJwtPayload: JwtPayloadType) {
@@ -506,7 +557,7 @@ export class TenantService {
       filePath + frontFileName,
     );
 
-    manager.save(uploadedFrontFile.file);
+    await manager.save(uploadedFrontFile.file);
 
     if (!uploadedFrontFile?.file) {
       this.logger.error(`${LOG_PREFIX} Failed to upload front ID image`);
@@ -580,7 +631,7 @@ export class TenantService {
       filePath + backFileName,
     );
 
-    manager.save(uploadedBackFile.file);
+    await manager.save(uploadedBackFile.file);
 
     if (!uploadedBackFile?.file) {
       this.logger.error(`${LOG_PREFIX} Failed to upload back ID image`);
@@ -611,7 +662,7 @@ export class TenantService {
     );
 
     // Validate user and tenant ownership, include file relations
-    const { tenant } = await TenantHelper.validateUserAndTenantOwnership(
+    await TenantHelper.validateUserAndTenantOwnership(
       this.usersService,
       this.tenantRepository,
       userJwtPayload,
@@ -685,7 +736,7 @@ export class TenantService {
     }
 
     // Finalize the archive
-    archive.finalize();
+    await archive.finalize();
 
     // Sanitize filename: remove special characters and replace spaces with hyphens
     const sanitizedName = (tenantWithFiles.name || 'tenant')

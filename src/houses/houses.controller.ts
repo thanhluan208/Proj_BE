@@ -28,7 +28,6 @@ import {
 } from 'src/utils/dto/paginated-response.dto';
 import { PaginationDto } from 'src/utils/dto/pagination.dto';
 import { AUTH_CONSTANTS } from 'src/utils/constant';
-import { OwnershipGuard } from 'src/auth/guards/ownership.guard';
 import { CheckOwnershipDynamic } from 'src/auth/decorators/ownership.decorator';
 
 @ApiBearerAuth()

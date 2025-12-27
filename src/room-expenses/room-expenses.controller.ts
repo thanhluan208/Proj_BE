@@ -14,6 +14,7 @@ import {
   UploadedFiles,
   UseGuards,
   UseInterceptors,
+  Headers as NestHeaders,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
@@ -24,6 +25,7 @@ import {
   ApiOkResponse,
   ApiParam,
   ApiTags,
+  ApiHeader,
 } from '@nestjs/swagger';
 import * as multer from 'multer';
 import { RoomExpenseEntity } from 'src/room-expenses/room-expense.entity';
@@ -48,6 +50,11 @@ export class RoomExpensesController {
   @ApiCreatedResponse({ type: [RoomExpenseEntity] })
   @ApiConsumes('multipart/form-data')
   @ApiBody(CreateApiBody)
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
+  })
   @Post('create')
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FilesInterceptor('receipts'))
@@ -56,12 +63,24 @@ export class RoomExpensesController {
     @Body('roomId') roomId: string,
     @Body('expenses') expensesRaw: string,
     @UploadedFiles() receipts: Express.Multer.File[],
+    @NestHeaders('x-timezone') timezone?: string,
   ): Promise<RoomExpenseEntity[]> {
-    return this.service.create(roomId, expensesRaw, receipts, request.user);
+    return this.service.create(
+      roomId,
+      expensesRaw,
+      receipts,
+      request.user,
+      timezone,
+    );
   }
 
   @ApiCreatedResponse({ type: RoomExpenseEntity })
   @ApiConsumes('multipart/form-data')
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
+  })
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiParam({ name: 'id', required: true, description: 'Room Expense ID' })
@@ -77,9 +96,10 @@ export class RoomExpensesController {
     @Param('id') id: string,
     @Request() request,
     @Body() body: EditRoomExpenseDto,
+    @NestHeaders('x-timezone') timezone?: string,
     @UploadedFile() receipt?: Express.Multer.File,
   ): Promise<RoomExpenseEntity | null> {
-    return this.service.update(id, body, request.user, receipt);
+    return this.service.update(id, body, request.user, timezone, receipt);
   }
 
   @ApiOkResponse({ type: PaginatedResponseDto<RoomExpenseEntity> })
@@ -94,6 +114,11 @@ export class RoomExpensesController {
   }
 
   @ApiOkResponse({ type: PaginatedResponseDto<RoomExpenseEntity> })
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
+  })
   @Get('room/:roomId')
   @HttpCode(HttpStatus.OK)
   @ApiParam({ name: 'roomId', required: true, description: 'Room ID' })
@@ -101,14 +126,24 @@ export class RoomExpensesController {
     @Param('roomId') roomId: string,
     @Request() request,
     @Query() payload: Omit<GetRoomExpensesDto, 'room'>,
+    @NestHeaders('x-timezone') timezone?: string,
   ): Promise<PaginatedResponseDto<RoomExpenseEntity>> {
-    return this.service.findByRoom(request.user, {
-      room: roomId,
-      ...payload,
-    });
+    return this.service.findByRoom(
+      request.user,
+      {
+        room: roomId,
+        ...payload,
+      },
+      timezone,
+    );
   }
 
   @ApiOkResponse({ type: PaginationInfoResponseDto })
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
+  })
   @Get('room/:roomId/paging')
   @HttpCode(HttpStatus.OK)
   @ApiParam({ name: 'roomId', required: true, description: 'Room ID' })
@@ -116,7 +151,8 @@ export class RoomExpensesController {
     @Param('roomId') roomId: string,
     @Request() request,
     @Query() payload: Omit<GetRoomExpensesDto, 'page' | 'pageSize'>,
+    @NestHeaders('x-timezone') timezone?: string,
   ): Promise<PaginationInfoResponseDto> {
-    return this.service.countByRoom(roomId, request.user, payload);
+    return this.service.countByRoom(roomId, request.user, payload, timezone);
   }
 }

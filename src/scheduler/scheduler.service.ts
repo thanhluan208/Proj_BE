@@ -10,18 +10,12 @@ import { CronJob } from 'cron';
 import { SchedulerRepository } from './scheduler.repository';
 import { SchedulerEntity } from './scheduler.entity';
 import { RRule } from 'rrule';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import timezone from 'dayjs/plugin/timezone';
+import dayjs from 'src/utils/date-utils';
 import { CreateBillSchedulerDto } from './dto/create-bill-scheduler.dto';
 import { JwtPayloadType } from 'src/auth/strategies/types/jwt-payload.type';
 import { BillingService } from 'src/billing/billing.service';
 import { BillingTypeEnum } from 'src/billing/billing-status.enum';
 import { CreateBillingDto } from 'src/billing/dto/create-billing.dto';
-
-// Extend dayjs with timezone support
-dayjs.extend(utc);
-dayjs.extend(timezone);
 
 @Injectable()
 export class SchedulerService implements OnModuleInit {
@@ -51,7 +45,7 @@ export class SchedulerService implements OnModuleInit {
       this.logger.log(`Found ${activeJobs.length} active scheduled jobs`);
 
       for (const job of activeJobs) {
-        await this.registerCronJob(job);
+        this.registerCronJob(job);
       }
 
       this.logger.log('All scheduled jobs loaded successfully');
@@ -63,7 +57,7 @@ export class SchedulerService implements OnModuleInit {
   /**
    * Register a cron job with the scheduler
    */
-  async registerCronJob(jobEntity: SchedulerEntity) {
+  registerCronJob(jobEntity: SchedulerEntity) {
     try {
       // Check if job already exists
       const existingJob = this.schedulerRegistry.getCronJob(jobEntity.id);
@@ -73,6 +67,7 @@ export class SchedulerService implements OnModuleInit {
       }
     } catch (error) {
       // Job doesn't exist, continue with registration
+      console.log('error', error);
     }
 
     try {
@@ -392,7 +387,7 @@ export class SchedulerService implements OnModuleInit {
     const job = await this.schedulerRepository.create(jobData);
 
     if (job.isActive) {
-      await this.registerCronJob(job);
+      this.registerCronJob(job);
     }
 
     return job;
@@ -405,12 +400,12 @@ export class SchedulerService implements OnModuleInit {
     try {
       const job = this.schedulerRegistry.getCronJob(jobId);
       if (job) {
-        job.stop();
+        await job.stop();
         this.schedulerRegistry.deleteCronJob(jobId);
         this.logger.log(`Removed cron job: ${jobId}`);
       }
     } catch (error) {
-      this.logger.warn(`Job ${jobId} not found in registry`);
+      this.logger.warn(`Job ${jobId} not found in registry`, error);
     }
 
     await this.schedulerRepository.softDelete(jobId);
@@ -433,7 +428,7 @@ export class SchedulerService implements OnModuleInit {
     await this.removeCronJob(jobId);
 
     if (updatedJob.isActive) {
-      await this.registerCronJob(updatedJob);
+      this.registerCronJob(updatedJob);
     }
 
     return updatedJob;

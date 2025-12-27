@@ -5,7 +5,7 @@ import {
   Logger,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import dayjs from 'dayjs';
+import dayjs, { convertToUTC, convertFromUTC } from 'src/utils/date-utils';
 import Docxtemplater from 'docxtemplater';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -32,7 +32,7 @@ import { REDIS_PREFIX_KEY } from 'src/utils/constant';
 import { TenantContractsService } from 'src/tenant-contracts/tenant-contracts.service';
 import { TenantContractEntity } from 'src/tenant-contracts/tenant-contracts.entity';
 import { CreateTenantContractDto } from 'src/tenant-contracts/dto/create-tenant-contract.dto';
-import { createHash, hash } from 'crypto';
+import { createHash } from 'crypto';
 import { DataSource } from 'typeorm';
 
 @Injectable()
@@ -60,7 +60,22 @@ export class ContractsService {
   async create(
     contractData: CreateContractDto,
     userJwtPayload: JwtPayloadType,
+    timezone: string = 'UTC',
   ) {
+    // Convert dates to UTC based on user's timezone
+    contractData.createdDate = convertToUTC(
+      contractData.createdDate,
+      timezone,
+    )?.toISOString() as string;
+    contractData.startDate = convertToUTC(
+      contractData.startDate,
+      timezone,
+    )?.toISOString() as string;
+    contractData.endDate = convertToUTC(
+      contractData.endDate,
+      timezone,
+    )?.toISOString() as string;
+
     const { owner, room, tenants } = await this.validate(
       contractData,
       userJwtPayload,
@@ -116,7 +131,7 @@ export class ContractsService {
 
       await Promise.all(createTenantContractQueue);
 
-      return newContract;
+      return this.formatContractResponse(newContract, timezone);
     });
   }
 
@@ -148,7 +163,7 @@ export class ContractsService {
       `${this.CACHE_CONTRACT_VERSION_KEY}:${userJwtPayload.id}`,
     );
 
-    return contract;
+    return this.formatContractResponse(contract, 'UTC');
   }
 
   async updateMainTenantContract(
@@ -224,7 +239,7 @@ export class ContractsService {
 
     const cachedKey = `${this.CACHED_KEY.findActiveContractByRoom}:${roomId}:${hashRelations}:${cacheVersion}`;
 
-    const room = this.roomService.findById(roomId, userId);
+    const room = await this.roomService.findById(roomId, userId);
     if (!room) {
       throw new BadRequestException({
         status: HttpStatus.BAD_REQUEST,
@@ -247,7 +262,7 @@ export class ContractsService {
       StatusEnum.active,
       relations,
     );
-    this.redisService.set(
+    await this.redisService.set(
       cachedKey,
       JSON.stringify(contract),
       this.CACHE_CONTRACT_TTL,
@@ -264,13 +279,14 @@ export class ContractsService {
       pageSize?: number;
       status?: string;
     },
+    timezone: string = 'UTC',
   ) {
     const cacheVersion =
       (await this.redisService.get(
         `${this.CACHE_CONTRACT_VERSION_KEY}:${userId}`,
       )) ?? '0';
 
-    const room = this.roomService.findById(roomId, userId);
+    const room = await this.roomService.findById(roomId, userId);
     if (!room) {
       throw new BadRequestException({
         status: HttpStatus.BAD_REQUEST,
@@ -316,11 +332,34 @@ export class ContractsService {
       }
     }
 
+    const formattedContracts = contracts.map((contract) =>
+      this.formatContractResponse(contract, timezone),
+    );
+
     return {
-      data: contracts,
+      data: formattedContracts,
       page,
       pageSize,
     };
+  }
+
+  private formatContractResponse(
+    contract: ContractEntity,
+    timezone: string,
+  ): ContractEntity {
+    if (contract.createdDate) {
+      contract.createdDate = convertFromUTC(
+        contract.createdDate,
+        timezone,
+      ) as any;
+    }
+    if (contract.startDate) {
+      contract.startDate = convertFromUTC(contract.startDate, timezone) as any;
+    }
+    if (contract.endDate) {
+      contract.endDate = convertFromUTC(contract.endDate, timezone) as any;
+    }
+    return contract;
   }
 
   async getTotalContractByRoom(
@@ -355,7 +394,7 @@ export class ContractsService {
       };
     }
 
-    const room = this.roomService.findById(roomId, userId);
+    const room = await this.roomService.findById(roomId, userId);
     if (!room) {
       throw new BadRequestException({
         status: HttpStatus.BAD_REQUEST,
@@ -369,7 +408,7 @@ export class ContractsService {
     })) as number;
 
     if (total > 0) {
-      this.redisService.set(
+      await this.redisService.set(
         cachedKey,
         JSON.stringify(total),
         this.CACHE_CONTRACT_TTL,
@@ -401,7 +440,7 @@ export class ContractsService {
 
     const queryData = await this.contractsRepository.findById(id, relations);
     if (queryData) {
-      this.redisService.set(
+      await this.redisService.set(
         cachedKey,
         JSON.stringify(queryData),
         this.CACHE_CONTRACT_TTL,
@@ -543,7 +582,7 @@ export class ContractsService {
   ): Promise<{ buffer: Buffer; file?: any }> {
     try {
       // Get contract data
-      const contractData = await this.generateContractData(
+      const contractData = this.generateContractData(
         owner,
         room,
         tenants,

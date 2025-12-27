@@ -16,7 +16,7 @@ import { CreateBillingDto } from './dto/create-billing.dto';
 import { PayBillingDto } from './dto/pay-billing.dto';
 
 import { createHash } from 'crypto';
-import dayjs from 'dayjs';
+import dayjs, { convertToUTC, convertFromUTC } from 'src/utils/date-utils';
 import { I18nService } from 'nestjs-i18n';
 import { FileEntity } from 'src/files/file.entity';
 import { FilesService } from 'src/files/files.service';
@@ -45,7 +45,15 @@ export class BillingService {
     private readonly fileService: FilesService,
   ) {}
 
-  async create(dto: CreateBillingDto, user: JwtPayloadType) {
+  async create(
+    dto: CreateBillingDto,
+    user: JwtPayloadType,
+    timezone: string = 'UTC',
+  ) {
+    // Convert dates to UTC based on user's timezone
+    dto.from = convertToUTC(dto.from, timezone) as Date;
+    dto.to = convertToUTC(dto.to, timezone) as Date;
+
     await this.validateCreate(dto);
 
     const { currentTenantContract, file, totalAmount } =
@@ -68,11 +76,7 @@ export class BillingService {
       type: dto.type,
     });
 
-    await this.redisService.incr(
-      `${this.CACHE_BILLING_VERSION_KEY}:${user.id}`,
-    );
-
-    return newBill;
+    return this.formatBillingResponse(newBill, timezone);
   }
 
   async delete(id: string, user: JwtPayloadType) {
@@ -89,10 +93,19 @@ export class BillingService {
       `${this.CACHE_BILLING_VERSION_KEY}:${user.id}`,
     );
 
-    return targetBill;
+    return this.formatBillingResponse(targetBill, 'UTC'); // Defaults to UTC for delete if no timezone provided
   }
 
-  async update(id: string, dto: CreateBillingDto, user: JwtPayloadType) {
+  async update(
+    id: string,
+    dto: CreateBillingDto,
+    user: JwtPayloadType,
+    timezone: string = 'UTC',
+  ) {
+    // Convert dates to UTC based on user's timezone
+    dto.from = convertToUTC(dto.from, timezone) as Date;
+    dto.to = convertToUTC(dto.to, timezone) as Date;
+
     await this.validateCreate(dto, id);
 
     const targetBill = await this.repository.findById(id, user.id, [
@@ -103,7 +116,7 @@ export class BillingService {
       'tenantContract.contract.status',
     ]);
 
-    await this.validateEdit(targetBill, dto);
+    this.validateEdit(targetBill, dto);
 
     const { currentTenantContract, file, totalAmount } =
       await this.generateBill(dto, user);
@@ -127,15 +140,21 @@ export class BillingService {
     await this.redisService.incr(
       `${this.CACHE_BILLING_VERSION_KEY}:${user.id}`,
     );
-    return newBill;
+    return this.formatBillingResponse(newBill, timezone);
   }
 
   async pay(
     id: string,
     dto: PayBillingDto,
     user: JwtPayloadType,
+    timezone: string = 'UTC',
     file?: Express.Multer.File,
   ) {
+    // Convert payment date to UTC
+    if (dto.paymentDate) {
+      dto.paymentDate = convertToUTC(dto.paymentDate, timezone) as Date;
+    }
+
     const targetBill = await this.repository.findById(id, user.id, [
       'room',
       'room.house',
@@ -181,11 +200,7 @@ export class BillingService {
       proof,
     });
 
-    await this.redisService.incr(
-      `${this.CACHE_BILLING_VERSION_KEY}:${user.id}`,
-    );
-
-    return result;
+    return this.formatBillingResponse(result, timezone);
   }
 
   async download(id: string, user: JwtPayloadType) {
@@ -309,9 +324,20 @@ export class BillingService {
     };
   }
 
-  async getTotalBillByRoom(dto: GetBillingDto, user: JwtPayloadType) {
-    const { room: roomId, sortBy, sortOrder, ...options } = dto;
+  async getTotalBillByRoom(
+    dto: GetBillingDto,
+    user: JwtPayloadType,
+    timezone: string = 'UTC',
+  ) {
+    const { room: roomId, ...options } = dto;
     const userId = user.id;
+
+    if (options.from) {
+      options.from = convertToUTC(options.from, timezone) as Date;
+    }
+    if (options.to) {
+      options.to = convertToUTC(options.to, timezone) as Date;
+    }
 
     const cacheVersion = await this.getCacheVersion(user.id);
 
@@ -336,7 +362,7 @@ export class BillingService {
       };
     }
 
-    const room = this.roomService.findById(roomId, userId);
+    const room = await this.roomService.findById(roomId, userId);
     if (!room) {
       throw new BadRequestException({
         status: HttpStatus.BAD_REQUEST,
@@ -352,7 +378,7 @@ export class BillingService {
     })) as number;
 
     if (total > 0) {
-      this.redisService.set(
+      await this.redisService.set(
         cachedKey,
         JSON.stringify(total),
         this.CACHE_BILLING_TTL,
@@ -364,9 +390,20 @@ export class BillingService {
     };
   }
 
-  async getBillsByRoom(dto: GetBillingDto, user: JwtPayloadType) {
+  async getBillsByRoom(
+    dto: GetBillingDto,
+    user: JwtPayloadType,
+    timezone: string = 'UTC',
+  ) {
     const { room: roomId, sortBy, sortOrder, ...options } = dto;
     const userId = user.id;
+
+    if (options.from) {
+      options.from = convertToUTC(options.from, timezone) as Date;
+    }
+    if (options.to) {
+      options.to = convertToUTC(options.to, timezone) as Date;
+    }
 
     const cacheVersion = await this.getCacheVersion(user.id);
 
@@ -393,7 +430,7 @@ export class BillingService {
       };
     }
 
-    const room = this.roomService.findById(roomId, userId);
+    const room = await this.roomService.findById(roomId, userId);
     if (!room) {
       throw new BadRequestException({
         status: HttpStatus.BAD_REQUEST,
@@ -419,10 +456,14 @@ export class BillingService {
       ],
     )) as BillingEntity[];
 
-    if (bills.length > 0) {
-      this.redisService.set(
+    const formattedBills = bills.map((bill) =>
+      this.formatBillingResponse(bill, timezone),
+    );
+
+    if (formattedBills.length > 0) {
+      await this.redisService.set(
         cachedKey,
-        JSON.stringify(bills),
+        JSON.stringify(formattedBills),
         this.CACHE_BILLING_TTL,
       );
     }
@@ -430,8 +471,24 @@ export class BillingService {
     return {
       page: options.page || 1,
       pageSize: options.pageSize || 10,
-      data: bills,
+      data: formattedBills,
     };
+  }
+
+  private formatBillingResponse(
+    bill: BillingEntity,
+    timezone: string,
+  ): BillingEntity {
+    if (bill.from) {
+      bill.from = convertFromUTC(bill.from, timezone) as any;
+    }
+    if (bill.to) {
+      bill.to = convertFromUTC(bill.to, timezone) as any;
+    }
+    if (bill.payment_date) {
+      bill.payment_date = convertFromUTC(bill.payment_date, timezone) as any;
+    }
+    return bill;
   }
 
   async getCacheVersion(userId: string) {
@@ -442,7 +499,7 @@ export class BillingService {
 
     if (dataCached) return JSON.parse(dataCached) as number;
     else
-      this.redisService.set(
+      await this.redisService.set(
         `${this.CACHE_BILLING_VERSION_KEY}:${userId}`,
         JSON.stringify(cachedVersion),
         86400,
@@ -486,7 +543,7 @@ export class BillingService {
     }
   }
 
-  async validateEdit(targetBill: BillingEntity | null, dto: CreateBillingDto) {
+  validateEdit(targetBill: BillingEntity | null, dto: CreateBillingDto) {
     const indexesProvided =
       dto.electricity_start_index != null ||
       dto.electricity_end_index != null ||

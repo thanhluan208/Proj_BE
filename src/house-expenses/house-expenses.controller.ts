@@ -10,6 +10,7 @@ import {
   Query,
   Request,
   UseGuards,
+  Headers as NestHeaders,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
@@ -17,6 +18,7 @@ import {
   ApiCreatedResponse,
   ApiParam,
   ApiTags,
+  ApiHeader,
 } from '@nestjs/swagger';
 import { AUTH_CONSTANTS } from 'src/utils/constant';
 import { OwnershipGuard } from 'src/auth/guards/ownership.guard';
@@ -39,16 +41,27 @@ export class HouseExpensesController {
   constructor(private readonly service: HouseExpensesService) {}
 
   @ApiCreatedResponse({ type: HouseExpenseEntity })
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
+  })
   @Post('create')
   @HttpCode(HttpStatus.CREATED)
   create(
     @Request() request,
     @Body() body: CreateHouseExpenseDto,
+    @NestHeaders('x-timezone') timezone?: string,
   ): Promise<HouseExpenseEntity> {
-    return this.service.create(body, request.user);
+    return this.service.create(body, request.user, timezone);
   }
 
   @ApiCreatedResponse({ type: HouseExpenseEntity })
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
+  })
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiParam({ name: 'id', required: true, description: 'House Expense ID' })
@@ -56,11 +69,17 @@ export class HouseExpensesController {
     @Param('id') id: string,
     @Request() request,
     @Body() body: CreateHouseExpenseDto,
+    @NestHeaders('x-timezone') timezone?: string,
   ): Promise<HouseExpenseEntity | null> {
-    return this.service.update(id, body, request.user);
+    return this.service.update(id, body, request.user, timezone);
   }
 
   @ApiCreatedResponse({ type: PaginatedResponseDto<HouseExpenseEntity> })
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
+  })
   @Get('house/:houseId')
   @HttpCode(HttpStatus.OK)
   @ApiParam({ name: 'houseId', required: true, description: 'House ID' })
@@ -73,8 +92,14 @@ export class HouseExpensesController {
     @Param('houseId') houseId: string,
     @Request() request,
     @Query() paginationDto: PaginationDto,
+    @NestHeaders('x-timezone') timezone?: string,
   ): Promise<PaginatedResponseDto<HouseExpenseEntity>> {
-    return this.service.findByHouse(houseId, request.user, paginationDto);
+    return this.service.findByHouse(
+      houseId,
+      request.user,
+      paginationDto,
+      timezone,
+    );
   }
 
   @ApiCreatedResponse({ type: PaginationInfoResponseDto })

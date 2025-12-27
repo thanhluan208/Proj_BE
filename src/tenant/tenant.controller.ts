@@ -13,10 +13,10 @@ import {
   Request,
   Res,
   StreamableFile,
-  UploadedFile,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
+  Headers as NestHeaders,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
@@ -29,6 +29,7 @@ import {
   ApiOkResponse,
   ApiParam,
   ApiTags,
+  ApiHeader,
 } from '@nestjs/swagger';
 import {
   PaginatedResponseDto,
@@ -50,41 +51,64 @@ export class TenantController {
   @ApiCreatedResponse({
     type: TenantEntity,
   })
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
+  })
   @Post('create')
   @HttpCode(HttpStatus.CREATED)
   create(
     @Request() request,
     @Body() body: CreateTenantDto,
+    @NestHeaders('x-timezone') timezone?: string,
   ): Promise<TenantEntity> {
-    return this.tenantService.create(body, request.user);
+    return this.tenantService.create(body, request.user, timezone);
   }
 
   @ApiCreatedResponse({
     type: PaginatedResponseDto<TenantEntity>,
+  })
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
   })
   @Get()
   @HttpCode(HttpStatus.OK)
   findByHouse(
     @Request() request,
     @Query() query: GetTenantDto,
+    @NestHeaders('x-timezone') timezone?: string,
   ): Promise<PaginatedResponseDto<TenantEntity>> {
-    return this.tenantService.findByRoom(request.user.id, query);
+    return this.tenantService.findByRoom(request.user.id, query, timezone);
   }
 
   @ApiCreatedResponse({
     type: PaginationInfoResponseDto,
+  })
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
   })
   @Get('paging')
   @HttpCode(HttpStatus.OK)
   countByHouse(
     @Request() request,
     @Query() query: GetTenantDto,
+    @NestHeaders('x-timezone') timezone?: string,
   ): Promise<PaginationInfoResponseDto> {
-    return this.tenantService.countByRoom(request.user.id, query);
+    return this.tenantService.countByRoom(request.user.id, query, timezone);
   }
 
   @ApiCreatedResponse({
     type: TenantEntity,
+  })
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
   })
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
@@ -92,8 +116,9 @@ export class TenantController {
     @Request() request,
     @Param('id') id: string,
     @Body() body: UpdateTenantDto,
+    @NestHeaders('x-timezone') timezone?: string,
   ): Promise<TenantEntity> {
-    return this.tenantService.update(id, body, request.user);
+    return this.tenantService.update(id, body, request.user, timezone);
   }
 
   @ApiTags('Tenants')
@@ -102,6 +127,11 @@ export class TenantController {
     type: TenantEntity,
   })
   @ApiConsumes('multipart/form-data')
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
+  })
   @Post(':roomId/upload-id-card')
   @UseInterceptors(
     FileFieldsInterceptor([
@@ -156,6 +186,7 @@ export class TenantController {
     },
 
     @Req() request: any,
+    @NestHeaders('x-timezone') timezone?: string,
   ): Promise<TenantEntity> {
     return this.tenantService.uploadIdCard(
       roomId,
@@ -165,6 +196,7 @@ export class TenantController {
       },
       request.user,
       body.id,
+      timezone,
     );
   }
 

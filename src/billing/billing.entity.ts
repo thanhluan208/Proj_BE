@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { FileEntity } from 'src/files/file.entity';
 import { RoomEntity } from 'src/rooms/room.entity';
-import { TenantEntity } from 'src/tenant/tenant.entity';
+import { TenantContractEntity } from 'src/tenant-contracts/tenant-contracts.entity';
 import { EntityRelationalHelper } from 'src/utils/relational-entity-helper';
 import {
   Column,
@@ -14,8 +15,6 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { BillingStatusEnum, BillingTypeEnum } from './billing-status.enum';
-import { TenantContractEntity } from 'src/tenant-contracts/tenant-contracts.entity';
-import { FileEntity } from 'src/files/file.entity';
 
 @Entity({
   name: 'billing',

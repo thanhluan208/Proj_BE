@@ -6,41 +6,40 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseFilePipeBuilder,
   Patch,
   Post,
   Query,
   Request,
-  UseGuards,
-  StreamableFile,
   Res,
-  BadRequestException,
+  StreamableFile,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+  Headers as NestHeaders,
 } from '@nestjs/common';
-import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiParam,
   ApiTags,
+  ApiHeader,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
+import * as multer from 'multer';
+import { FilesService } from 'src/files/files.service';
 import { AUTH_CONSTANTS } from 'src/utils/constant';
+import { PaginatedResponseDto } from 'src/utils/dto/paginated-response.dto';
 import { BillingEntity } from './billing.entity';
 import { BillingService } from './billing.service';
 import { CreateBillingDto } from './dto/create-billing.dto';
-import { PaginatedResponseDto } from 'src/utils/dto/paginated-response.dto';
 import { GetBillingDto } from './dto/get-billing.dto';
-import { ApiConsumes } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
-import {
-  ParseFilePipeBuilder,
-  UploadedFile,
-  UseInterceptors,
-} from '@nestjs/common';
 import { PayBillingDto } from './dto/pay-billing.dto';
-import * as multer from 'multer';
-import { FilesService } from 'src/files/files.service';
 
 @ApiBearerAuth()
 @ApiTags('billing')
@@ -55,25 +54,37 @@ export class BillingController {
   @ApiCreatedResponse({
     type: BillingEntity,
   })
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
+  })
   @Post('create')
   @HttpCode(HttpStatus.CREATED)
   create(
     @Request() request,
     @Body() body: CreateBillingDto,
+    @NestHeaders('x-timezone') timezone?: string,
   ): Promise<BillingEntity> {
-    return this.service.create(body, request.user);
+    return this.service.create(body, request.user, timezone);
   }
 
   @ApiOkResponse({
     type: PaginatedResponseDto<BillingEntity>,
+  })
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
   })
   @Get()
   @HttpCode(HttpStatus.OK)
   findByHouse(
     @Request() request,
     @Query() query: GetBillingDto,
+    @NestHeaders('x-timezone') timezone?: string,
   ): Promise<PaginatedResponseDto<BillingEntity>> {
-    return this.service.getBillsByRoom(query, request.user);
+    return this.service.getBillsByRoom(query, request.user, timezone);
   }
 
   @ApiOkResponse({
@@ -89,6 +100,11 @@ export class BillingController {
   @ApiOkResponse({
     type: PaginatedResponseDto<BillingEntity>,
   })
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
+  })
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiParam({ name: 'id', required: true, description: 'Billing ID' })
@@ -96,8 +112,9 @@ export class BillingController {
     @Request() request,
     @Param('id') id: string,
     @Body() body: CreateBillingDto,
+    @NestHeaders('x-timezone') timezone?: string,
   ): Promise<BillingEntity> {
-    return this.service.update(id, body, request.user);
+    return this.service.update(id, body, request.user, timezone);
   }
 
   @ApiOkResponse({
@@ -108,18 +125,29 @@ export class BillingController {
       },
     },
   })
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
+  })
   @Get('paging')
   @HttpCode(HttpStatus.OK)
   getTotalByHouse(
     @Request() request,
     @Query() query: GetBillingDto,
+    @NestHeaders('x-timezone') timezone?: string,
   ): Promise<{ total: number }> {
-    return this.service.getTotalBillByRoom(query, request.user);
+    return this.service.getTotalBillByRoom(query, request.user, timezone);
   }
 
   @Post(':id/pay')
   @HttpCode(HttpStatus.OK)
   @ApiConsumes('multipart/form-data')
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
+  })
   @UseInterceptors(
     FileInterceptor('proof', {
       storage: multer.memoryStorage(),
@@ -152,6 +180,7 @@ export class BillingController {
     @Request() request,
     @Param('id') id: string,
     @Body() body: PayBillingDto,
+    @NestHeaders('x-timezone') timezone?: string,
     @UploadedFile(
       new ParseFilePipeBuilder()
         .addMaxSizeValidator({ maxSize: 5 * 1024 * 1024 })
@@ -161,11 +190,7 @@ export class BillingController {
     )
     proof?: Express.Multer.File,
   ) {
-    return this.service.pay(id, body, request.user, proof);
-    // return this.minioService.uploadFileWithCustomPath(
-    //   proof as unknown as Express.Multer.File,
-    //   'test/hihi/haha',
-    // );
+    return this.service.pay(id, body, request.user, timezone, proof);
   }
 
   @Get(':id/download')

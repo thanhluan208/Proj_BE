@@ -12,7 +12,7 @@ export class HealthController {
   ) {}
 
   @Get('i18n')
-  async checkI18n() {
+  checkI18n() {
     const text = this.i18n.t('auth.title', {
       lang: I18nContext.current()?.lang,
     });

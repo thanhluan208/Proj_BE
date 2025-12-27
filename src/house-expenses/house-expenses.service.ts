@@ -9,6 +9,7 @@ import {
   PaginatedResponseDto,
   PaginationInfoResponseDto,
 } from 'src/utils/dto/paginated-response.dto';
+import { convertToUTC, convertFromUTC } from 'src/utils/date-utils';
 
 @Injectable()
 export class HouseExpensesService {
@@ -17,7 +18,11 @@ export class HouseExpensesService {
     private readonly expenseRepository: HouseExpenseRepository,
   ) {}
 
-  async create(dto: CreateHouseExpenseDto, user: JwtPayloadType) {
+  async create(
+    dto: CreateHouseExpenseDto,
+    user: JwtPayloadType,
+    timezone: string = 'UTC',
+  ) {
     const house = await this.houseRepository.findByIdAndOwner(
       dto.houseId,
       user.id,
@@ -29,30 +34,31 @@ export class HouseExpensesService {
       });
     }
 
-    const expense: Partial<HouseExpenseEntity> = {
-      house,
-      name: dto.name,
-      amount: dto.amount,
-      date: new Date(dto.date),
-    };
+    const expense = new HouseExpenseEntity();
+    expense.house = house;
+    expense.name = dto.name;
+    expense.amount = dto.amount;
+    expense.date = convertToUTC(dto.date, timezone) as Date;
 
-    return await this.expenseRepository.create(expense);
+    const savedExpense = await this.expenseRepository.create(expense);
+    return this.formatHouseExpenseResponse(savedExpense, timezone);
   }
 
   async update(
     id: string,
-    payload: Partial<CreateHouseExpenseDto>,
+    payload: CreateHouseExpenseDto,
     user: JwtPayloadType,
+    timezone: string = 'UTC',
   ) {
-    const current = await this.expenseRepository.findById(id);
-    if (!current) {
+    const expense = await this.expenseRepository.findById(id);
+    if (!expense) {
       throw new BadRequestException({
         status: HttpStatus.BAD_REQUEST,
         errors: { expense: 'houseExpenseNotFound' },
       });
     }
 
-    const houseId = payload.houseId ?? current.house.id;
+    const houseId = payload.houseId ?? expense.house.id;
     const house = await this.houseRepository.findByIdAndOwner(houseId, user.id);
     if (!house) {
       throw new BadRequestException({
@@ -61,18 +67,24 @@ export class HouseExpensesService {
       });
     }
 
-    return await this.expenseRepository.update(id, {
-      house,
-      name: payload.name ?? current.name,
-      amount: payload.amount ?? current.amount,
-      date: payload.date ? new Date(payload.date) : current.date,
-    });
+    expense.house = house;
+    expense.name = payload.name;
+    expense.amount = payload.amount;
+    if (payload.date) {
+      expense.date = convertToUTC(payload.date, timezone) as Date;
+    }
+
+    const savedExpense = await this.expenseRepository.update(id, expense);
+    return savedExpense
+      ? this.formatHouseExpenseResponse(savedExpense, timezone)
+      : null;
   }
 
   async findByHouse(
     houseId: string,
     user: JwtPayloadType,
-    pagination: PaginationDto,
+    paginationDto: PaginationDto,
+    timezone: string = 'UTC',
   ): Promise<PaginatedResponseDto<HouseExpenseEntity>> {
     const house = await this.houseRepository.findByIdAndOwner(houseId, user.id);
     if (!house) {
@@ -82,13 +94,23 @@ export class HouseExpensesService {
       });
     }
 
-    const { page = 1, pageSize = 10 } = pagination;
+    const { page = 1, pageSize = 10 } = paginationDto;
     const skip = (page - 1) * pageSize;
+
     const data = await this.expenseRepository.findByHouse(houseId, {
       skip,
       take: pageSize,
     });
-    return { data, page, pageSize };
+
+    const formattedData = data.map((expense) =>
+      this.formatHouseExpenseResponse(expense, timezone),
+    );
+
+    return {
+      data: formattedData,
+      page,
+      pageSize,
+    };
   }
 
   async countByHouse(
@@ -104,5 +126,19 @@ export class HouseExpensesService {
     }
     const total = await this.expenseRepository.countByHouse(houseId);
     return { total };
+  }
+
+  private formatHouseExpenseResponse(
+    expense: HouseExpenseEntity,
+    timezone: string,
+  ): HouseExpenseEntity {
+    if (expense.date) {
+      expense.date = convertFromUTC(
+        expense.date,
+        timezone,
+        'YYYY-MM-DD',
+      ) as any;
+    }
+    return expense;
   }
 }

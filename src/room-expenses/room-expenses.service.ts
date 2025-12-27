@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { JwtPayloadType } from 'src/auth/strategies/types/jwt-payload.type';
-import { FileEntity } from 'src/files/file.entity';
 import { FilesService } from 'src/files/files.service';
 import { RedisService } from 'src/redis/redis.service';
 import { RoomExpenseEntity } from 'src/room-expenses/room-expense.entity';
@@ -17,6 +16,7 @@ import { PaginatedResponseDto } from 'src/utils/dto/paginated-response.dto';
 import { EditRoomExpenseDto, Expense } from './dto/create-room-expense.dto';
 import { GetRoomExpensesDto } from './dto/get-room-expense.dto';
 import { RoomExpenseRepository } from './room-expense.repository';
+import { convertToUTC, convertFromUTC } from 'src/utils/date-utils';
 
 @Injectable()
 export class RoomExpensesService {
@@ -37,6 +37,7 @@ export class RoomExpensesService {
     expensesRaw: string,
     receipts: Express.Multer.File[],
     user: JwtPayloadType,
+    timezone: string = 'UTC',
   ) {
     const room = await this.roomRepository.findByIdAndOwner(roomId, user.id);
 
@@ -52,6 +53,10 @@ export class RoomExpensesService {
     let fileIndex = 0;
     const parsedExpense = await Promise.all(
       expenses.map(async (elm) => {
+        // Convert expense date to UTC and keep it as string for the entity
+        const utcDate = convertToUTC(elm.date, timezone);
+        elm.date = utcDate ? utcDate.toISOString().split('T')[0] : elm.date;
+
         if (elm.hasFile) {
           const fileName = elm.name;
           const filePath = `${user.id}/${room.house.id}/${room.id}/expense_receipts/${fileName}`;
@@ -87,28 +92,39 @@ export class RoomExpensesService {
       }),
     );
 
-    this.redisService.incr(
-      `${this.CACHE_ROOM_EXPENSE_VERSION_KEY}:${user.id}:${room.id}`,
+    const result = await this.expenseRepository.create(parsedExpense);
+    return result.map((expense) =>
+      this.formatRoomExpenseResponse(expense, timezone),
     );
-
-    return await this.expenseRepository.create(parsedExpense);
   }
 
   async update(
     id: string,
     payload: EditRoomExpenseDto,
     user: JwtPayloadType,
+    timezone: string = 'UTC',
     receipt?: Express.Multer.File,
   ) {
-    const current = await this.expenseRepository.findById(id);
-    if (!current) {
+    // Convert expense date to UTC
+    if (payload.date) {
+      const utcDate = convertToUTC(payload.date, timezone);
+      payload.date = utcDate
+        ? utcDate.toISOString().split('T')[0]
+        : payload.date;
+    }
+
+    const existingExpense = await this.expenseRepository.findById(id, [
+      'room',
+      'room.house',
+    ]);
+    if (!existingExpense) {
       throw new BadRequestException({
         status: HttpStatus.BAD_REQUEST,
         errors: { expense: 'roomExpenseNotFound' },
       });
     }
 
-    const roomId = payload.roomId ?? current.room.id;
+    const roomId = payload.roomId ?? existingExpense.room.id;
     const room = await this.roomRepository.findByIdAndOwner(roomId, user.id);
     if (!room) {
       throw new BadRequestException({
@@ -118,7 +134,7 @@ export class RoomExpensesService {
     }
 
     if (payload.hasFile && receipt?.buffer) {
-      const fileName = payload.name;
+      const fileName = payload.name || existingExpense.name;
       const filePath = `${user.id}/${room.house.id}/${room.id}/expense_receipts/${fileName}`;
 
       const file = await this.fileService.uploadFileWithCustomPath(
@@ -126,24 +142,27 @@ export class RoomExpensesService {
         filePath,
         user.id,
       );
-      current.receipt = file.file;
+      existingExpense.receipt = file.file;
+    } else if (!payload.hasFile) {
+      existingExpense.receipt = null;
     }
-
-    if (!payload.hasFile) current.receipt = null;
 
     await this.redisService.incr(
       `${this.CACHE_ROOM_EXPENSE_VERSION_KEY}:${user.id}:${room.id}`,
     );
 
-    return await this.expenseRepository.update(id, {
-      ...current,
+    const result = await this.expenseRepository.update(id, {
+      ...existingExpense,
       room,
-      isAssetHandedOver: payload.isAssetHandedOver,
-      name: payload.name,
-      amount: payload.amount,
-      date: payload.date,
+      name: payload.name ?? existingExpense.name,
+      amount: payload.amount ?? existingExpense.amount,
+      date: payload.date ?? existingExpense.date,
+      isAssetHandedOver:
+        payload.isAssetHandedOver ?? existingExpense.isAssetHandedOver,
       notes: payload.notes || null,
     });
+
+    return result ? this.formatRoomExpenseResponse(result, timezone) : null;
   }
 
   async delete(id: string, user: JwtPayloadType) {
@@ -171,12 +190,13 @@ export class RoomExpensesService {
     await this.redisService.incr(
       `${this.CACHE_ROOM_EXPENSE_VERSION_KEY}:${user.id}:${room.id}`,
     );
-    return current;
+    return this.formatRoomExpenseResponse(current, 'UTC');
   }
 
   async findByRoom(
     user: JwtPayloadType,
     payload: GetRoomExpensesDto,
+    timezone: string = 'UTC',
   ): Promise<PaginatedResponseDto<RoomExpenseEntity>> {
     // Check if room exists
     const room = await this.roomRepository.findByIdAndOwner(
@@ -191,6 +211,18 @@ export class RoomExpensesService {
           room: 'roomNotFound',
         },
       });
+    }
+
+    // Convert date filters to UTC
+    if (payload.from) {
+      const utcDate = convertToUTC(payload.from, timezone);
+      payload.from = utcDate
+        ? utcDate.toISOString().split('T')[0]
+        : payload.from;
+    }
+    if (payload.to) {
+      const utcDate = convertToUTC(payload.to, timezone);
+      payload.to = utcDate ? utcDate.toISOString().split('T')[0] : payload.to;
     }
 
     // Pagination
@@ -253,11 +285,29 @@ export class RoomExpensesService {
       }
     }
 
+    const formattedExpenses = expenses.map((expense) =>
+      this.formatRoomExpenseResponse(expense, timezone),
+    );
+
     return {
-      data: expenses,
+      data: formattedExpenses,
       page,
       pageSize,
     };
+  }
+
+  private formatRoomExpenseResponse(
+    expense: RoomExpenseEntity,
+    timezone: string,
+  ): RoomExpenseEntity {
+    if (expense.date) {
+      expense.date = convertFromUTC(
+        expense.date,
+        timezone,
+        'YYYY-MM-DD',
+      ) as any;
+    }
+    return expense;
   }
 
   async countByRoom(
@@ -270,6 +320,7 @@ export class RoomExpensesService {
       amount?: number;
       comparison?: 'bigger' | 'smaller';
     },
+    timezone: string = 'UTC',
   ): Promise<{ total: number }> {
     // Check if room exists
     const room = await this.roomRepository.findByIdAndOwner(roomId, user.id);
@@ -281,6 +332,18 @@ export class RoomExpensesService {
           room: 'roomNotFound',
         },
       });
+    }
+
+    // Convert date filters to UTC
+    if (filters?.from) {
+      const utcDate = convertToUTC(filters.from, timezone);
+      filters.from = utcDate
+        ? utcDate.toISOString().split('T')[0]
+        : filters.from;
+    }
+    if (filters?.to) {
+      const utcDate = convertToUTC(filters.to, timezone);
+      filters.to = utcDate ? utcDate.toISOString().split('T')[0] : filters.to;
     }
 
     // Create filter hash for cache key

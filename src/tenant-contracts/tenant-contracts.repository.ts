@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
-import { PaginationOptions } from 'src/utils/types/common.type';
 import { TenantContractEntity } from './tenant-contracts.entity';
 import { StatusEnum } from 'src/statuses/statuses.enum';
 

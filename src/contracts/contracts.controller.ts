@@ -10,6 +10,7 @@ import {
   Query,
   Request,
   UseGuards,
+  Headers as NestHeaders,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
@@ -18,6 +19,7 @@ import {
   ApiOkResponse,
   ApiParam,
   ApiTags,
+  ApiHeader,
 } from '@nestjs/swagger';
 import { ContractEntity } from './contract.entity';
 import { ContractsService } from './contracts.service';
@@ -36,10 +38,23 @@ export class ContractsController {
   @ApiCreatedResponse({
     type: ContractEntity,
   })
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
+  })
   @Post('create')
   @HttpCode(HttpStatus.CREATED)
-  async create(@Request() request, @Body() contractData: CreateContractDto) {
-    return await this.contractsService.create(contractData, request.user);
+  async create(
+    @Request() request,
+    @Body() contractData: CreateContractDto,
+    @NestHeaders('x-timezone') timezone?: string,
+  ) {
+    return await this.contractsService.create(
+      contractData,
+      request.user,
+      timezone,
+    );
   }
 
   @ApiCreatedResponse({
@@ -70,16 +85,23 @@ export class ContractsController {
   @ApiOkResponse({
     type: PaginatedResponseDto<ContractEntity>,
   })
+  @ApiHeader({
+    name: 'X-Timezone',
+    description: 'User timezone (IANA format, e.g., Asia/Ho_Chi_Minh)',
+    required: false,
+  })
   @Get()
   @HttpCode(HttpStatus.OK)
   findByHouse(
     @Request() request,
     @Query() query: GetContractDto,
+    @NestHeaders('x-timezone') timezone?: string,
   ): Promise<PaginatedResponseDto<ContractEntity>> {
     return this.contractsService.findContractsByRoom(
       query.room,
       request.user.id,
       query,
+      timezone,
     );
   }
 

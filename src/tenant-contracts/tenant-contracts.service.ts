@@ -49,7 +49,7 @@ export class TenantContractsService {
       existRecord =
         await this.tenantContractRepository.findByActiveTenant(tenantId);
 
-      this.redisService.set(
+      await this.redisService.set(
         `${this.CACHED_KEY.findByActiveTenant}:${tenantId}:${cacheVersion}`,
         JSON.stringify(existRecord),
         this.CACHE_TENANT_CONTRACT_TTL,
@@ -109,7 +109,7 @@ export class TenantContractsService {
     }
 
     if (currentMainTenant) {
-      this.tenantContractRepository.update(currentMainTenant?.id, {
+      await this.tenantContractRepository.update(currentMainTenant?.id, {
         isMainTenant: false,
       });
     }
@@ -189,7 +189,7 @@ export class TenantContractsService {
     );
 
     if (contract) {
-      this.redisService.set(
+      await this.redisService.set(
         cachedKey,
         JSON.stringify(contract),
         this.CACHE_TENANT_CONTRACT_TTL,
